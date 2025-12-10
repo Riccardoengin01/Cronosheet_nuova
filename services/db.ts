@@ -128,6 +128,33 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
   return data;
 };
 
+export const createUserProfile = async (userId: string, email: string): Promise<UserProfile | null> => {
+    // Check if profile already exists to avoid duplicate key error
+    const existing = await getUserProfile(userId);
+    if (existing) return existing;
+
+    const newProfile = {
+        id: userId,
+        email: email,
+        role: 'user', // Default role
+        subscription_status: 'trial',
+        trial_ends_at: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(), // 60 days trial
+        is_approved: false // Requires admin approval
+    };
+
+    const { data, error } = await supabase
+        .from('profiles')
+        .insert([newProfile])
+        .select()
+        .single();
+    
+    if (error) {
+        console.error("Error creating profile:", error);
+        return null;
+    }
+    return data;
+};
+
 export const getAllProfiles = async (): Promise<UserProfile[]> => {
     // This will only return all profiles if the logged-in user is an admin due to RLS
     const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });

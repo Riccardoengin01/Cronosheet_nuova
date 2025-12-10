@@ -84,7 +84,7 @@ function App() {
     // Check active session
     supabase.auth.getSession().then(({ data: { session } }) => {
         if (session) {
-            fetchUserProfile(session.user.id);
+            fetchUserProfile(session.user);
         } else {
             setLoadingAuth(false);
         }
@@ -93,7 +93,7 @@ function App() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
         if (session) {
-            fetchUserProfile(session.user.id);
+            fetchUserProfile(session.user);
         } else {
             setProfile(null);
             setLoadingAuth(false);
@@ -103,8 +103,15 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchUserProfile = async (userId: string) => {
-      const p = await DB.getUserProfile(userId);
+  const fetchUserProfile = async (user: { id: string, email?: string }) => {
+      let p = await DB.getUserProfile(user.id);
+      
+      // Se il profilo non esiste (es. mancava il trigger SQL), proviamo a crearlo al volo
+      if (!p && user.email) {
+          console.log("Profilo mancante. Tentativo di creazione automatica...");
+          p = await DB.createUserProfile(user.id, user.email);
+      }
+
       setProfile(p);
       setLoadingAuth(false);
   };
@@ -194,8 +201,9 @@ function App() {
                       Il tuo account è stato creato ed è in attesa di approvazione da parte dell'amministratore.
                   </p>
                   <div className="bg-indigo-50 p-4 rounded-lg text-xs text-left mb-6 text-indigo-800">
-                      <strong>Stato:</strong> In attesa di verifica.<br/>
-                      Contatta l'amministratore se l'attesa si prolunga.
+                      <strong>ID Utente:</strong> <span className="font-mono">{profile.id}</span><br/>
+                      <strong>Stato:</strong> In attesa di verifica manuale.
+                      <p className="mt-2 text-slate-500 italic">Se sei l'amministratore, vai su Supabase &gt; Table Editor &gt; profiles e imposta <code>is_approved = TRUE</code> e <code>role = admin</code> per questo utente.</p>
                   </div>
                   <button onClick={handleLogout} className="w-full bg-slate-900 text-white py-2 rounded-lg font-bold hover:bg-slate-800">
                       Torna al Login
