@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Project, TimeEntry } from '../types';
 import { formatCurrency, formatDuration, calculateEarnings, formatTime } from '../utils';
-import { Printer, Calendar, FileText, Download } from 'lucide-react';
+import { Printer, Calendar, FileText, CheckSquare, Square, Filter } from 'lucide-react';
 
 interface BillingProps {
   entries: TimeEntry[];
@@ -9,21 +9,45 @@ interface BillingProps {
 }
 
 const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(projects[0]?.id || '');
+  // Supporto Multi-Selezione
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  
   const [selectedMonth, setSelectedMonth] = useState<string>(
     new Date().toISOString().slice(0, 7) // YYYY-MM
   );
 
-  const selectedProject = projects.find(p => p.id === selectedProjectId);
+  // Inizializza selezionando tutti i progetti quando vengono caricati
+  useEffect(() => {
+      if (projects.length > 0 && selectedProjectIds.length === 0) {
+          setSelectedProjectIds(projects.map(p => p.id));
+      }
+  }, [projects]);
+
+  const toggleProject = (id: string) => {
+      if (selectedProjectIds.includes(id)) {
+          setSelectedProjectIds(selectedProjectIds.filter(pid => pid !== id));
+      } else {
+          setSelectedProjectIds([...selectedProjectIds, id]);
+      }
+  };
+
+  const toggleAll = () => {
+      if (selectedProjectIds.length === projects.length) {
+          setSelectedProjectIds([]);
+      } else {
+          setSelectedProjectIds(projects.map(p => p.id));
+      }
+  };
 
   const filteredEntries = useMemo(() => {
     return entries.filter(e => {
-        if (!selectedProjectId || !selectedMonth) return false;
+        if (selectedProjectIds.length === 0 || !selectedMonth) return false;
         
         const entryMonth = new Date(e.startTime).toISOString().slice(0, 7);
-        return e.projectId === selectedProjectId && entryMonth === selectedMonth;
+        // Filtra se l'ID progetto è nell'array dei selezionati
+        return selectedProjectIds.includes(e.projectId) && entryMonth === selectedMonth;
     }).sort((a, b) => a.startTime - b.startTime);
-  }, [entries, selectedProjectId, selectedMonth]);
+  }, [entries, selectedProjectIds, selectedMonth]);
 
   const totalAmount = filteredEntries.reduce((acc, curr) => acc + calculateEarnings(curr), 0);
   const totalHours = filteredEntries.reduce((acc, curr) => acc + (curr.duration || 0), 0) / 3600;
@@ -40,6 +64,9 @@ const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
       );
   }
 
+  // Determina se mostrare la colonna "Cliente" (utile se ne ho selezionati più di uno)
+  const showProjectColumn = selectedProjectIds.length > 1;
+
   return (
     <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
       
@@ -49,20 +76,9 @@ const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
             <Calendar className="text-indigo-600" />
             Configura Riepilogo
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Cliente / Postazione</label>
-                <select 
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                    value={selectedProjectId}
-                    onChange={e => setSelectedProjectId(e.target.value)}
-                >
-                    {projects.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                </select>
-            </div>
-            <div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Mese di Riferimento</label>
                 <input 
                     type="month"
@@ -71,7 +87,7 @@ const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
                     onChange={e => setSelectedMonth(e.target.value)}
                 />
             </div>
-            <div className="flex items-end">
+             <div className="flex items-end">
                 <button 
                     onClick={handlePrint}
                     className="w-full flex items-center justify-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-900 transition-colors shadow-md"
@@ -80,10 +96,42 @@ const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
                 </button>
             </div>
         </div>
+
+        <div>
+            <div className="flex justify-between items-center mb-2">
+                <label className="block text-sm font-medium text-gray-700">Seleziona Clienti da includere:</label>
+                <button 
+                    onClick={toggleAll}
+                    className="text-xs text-indigo-600 font-bold hover:underline"
+                >
+                    {selectedProjectIds.length === projects.length ? 'Deseleziona Tutti' : 'Seleziona Tutti'}
+                </button>
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 border border-gray-100 p-3 rounded-lg bg-gray-50 max-h-48 overflow-y-auto">
+                {projects.map(p => {
+                    const isSelected = selectedProjectIds.includes(p.id);
+                    return (
+                        <button
+                            key={p.id}
+                            onClick={() => toggleProject(p.id)}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm border transition-all text-left ${
+                                isSelected 
+                                ? 'bg-indigo-50 border-indigo-200 text-indigo-800' 
+                                : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                            }`}
+                        >
+                            {isSelected ? <CheckSquare size={16} className="text-indigo-600 shrink-0" /> : <Square size={16} className="text-gray-300 shrink-0" />}
+                            <span className="truncate">{p.name}</span>
+                        </button>
+                    )
+                })}
+            </div>
+        </div>
       </div>
 
       {/* The Bill / Summary Document */}
-      <div className="bg-white p-10 rounded-none md:rounded-xl shadow-lg print:shadow-none print:border-none print:w-full print:p-0">
+      <div className="bg-white p-10 rounded-none md:rounded-xl shadow-lg print:shadow-none print:border-none print:w-full print:p-0 min-h-[800px]">
           
           {/* Header */}
           <div className="border-b-2 border-slate-800 pb-6 mb-8 flex justify-between items-start">
@@ -92,7 +140,11 @@ const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
                   <p className="text-slate-500 mt-2">Documento informativo prestazioni</p>
               </div>
               <div className="text-right">
-                  <h3 className="text-xl font-bold text-indigo-600">{selectedProject?.name}</h3>
+                  <h3 className="text-xl font-bold text-indigo-600">
+                      {selectedProjectIds.length === 1 
+                        ? projects.find(p => p.id === selectedProjectIds[0])?.name 
+                        : 'Riepilogo Multi-Cliente'}
+                  </h3>
                   <p className="text-slate-600 font-medium">
                       Periodo: {new Date(selectedMonth).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}
                   </p>
@@ -105,6 +157,7 @@ const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
                   <thead>
                       <tr className="bg-gray-100 text-gray-700 uppercase text-xs font-bold tracking-wider">
                           <th className="px-4 py-3 rounded-l-lg">Data</th>
+                          {showProjectColumn && <th className="px-4 py-3">Cliente</th>}
                           <th className="px-4 py-3">Orario</th>
                           <th className="px-4 py-3">Descrizione</th>
                           <th className="px-4 py-3 text-right">Ore</th>
@@ -117,13 +170,21 @@ const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
                       {filteredEntries.map(entry => {
                           const earnings = calculateEarnings(entry);
                           const expensesTotal = entry.expenses ? entry.expenses.reduce((s, x) => s + x.amount, 0) : 0;
-                          
+                          const project = projects.find(p => p.id === entry.projectId);
+
                           return (
                               <tr key={entry.id} className="hover:bg-gray-50">
-                                  <td className="px-4 py-3 font-medium text-slate-800">
+                                  <td className="px-4 py-3 font-medium text-slate-800 whitespace-nowrap">
                                       {new Date(entry.startTime).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })}
                                   </td>
-                                  <td className="px-4 py-3 font-mono text-slate-600">
+                                  
+                                  {showProjectColumn && (
+                                     <td className="px-4 py-3 text-indigo-600 font-semibold text-xs uppercase tracking-wide">
+                                         {project?.name || '-'}
+                                     </td>
+                                  )}
+
+                                  <td className="px-4 py-3 font-mono text-slate-600 whitespace-nowrap">
                                       {formatTime(entry.startTime)} - {entry.endTime ? formatTime(entry.endTime) : '...'}
                                   </td>
                                   <td className="px-4 py-3 text-slate-600 max-w-xs truncate">
@@ -147,8 +208,8 @@ const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
                       })}
                       {filteredEntries.length === 0 && (
                           <tr>
-                              <td colSpan={7} className="px-4 py-8 text-center text-gray-400 italic">
-                                  Nessuna voce presente per questo periodo.
+                              <td colSpan={showProjectColumn ? 8 : 7} className="px-4 py-8 text-center text-gray-400 italic">
+                                  Nessuna voce trovata per i criteri selezionati.
                               </td>
                           </tr>
                       )}
@@ -157,7 +218,7 @@ const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
           </div>
 
           {/* Footer Totals */}
-          <div className="mt-8 border-t-2 border-slate-200 pt-6 flex justify-end">
+          <div className="mt-8 border-t-2 border-slate-200 pt-6 flex justify-end break-inside-avoid">
               <div className="w-full md:w-1/2 lg:w-1/3 space-y-3">
                   <div className="flex justify-between text-slate-600">
                       <span>Totale Ore Lavorate:</span>

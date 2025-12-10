@@ -8,7 +8,7 @@ create table if not exists public.profiles (
   role text default 'user',
   subscription_status text default 'trial',
   trial_ends_at timestamptz,
-  is_approved boolean default false,
+  is_approved boolean default true,
   created_at timestamptz default now()
 );
 

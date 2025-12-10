@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { UserProfile } from '../types';
 import * as DB from '../services/db';
-import { Check, Shield, Trash2, RefreshCw, Crown, Star, Clock, UserCog, User, Search, TrendingUp, Users, AlertCircle } from 'lucide-react';
+import { Check, Shield, Trash2, RefreshCw, Crown, Star, Clock, UserCog, User, Search, TrendingUp, Users, AlertCircle, Ban, CheckCircle } from 'lucide-react';
 
 const AdminPanel = () => {
     const [users, setUsers] = useState<UserProfile[]>([]);
@@ -19,12 +19,16 @@ const AdminPanel = () => {
         setLoading(false);
     };
 
-    const handleApprove = async (user: UserProfile) => {
+    const handleToggleApproval = async (user: UserProfile) => {
+        const newStatus = !user.is_approved;
+        if (!newStatus && !window.confirm("Sei sicuro di voler sospendere questo utente? Non potrà più accedere.")) {
+            return;
+        }
         try {
-            await DB.updateUserProfileAdmin({ id: user.id, is_approved: true });
+            await DB.updateUserProfileAdmin({ id: user.id, is_approved: newStatus });
             loadUsers();
         } catch (e) {
-            alert("Errore durante l'approvazione");
+            alert("Errore durante l'aggiornamento dello stato");
         }
     };
 
@@ -116,11 +120,11 @@ const AdminPanel = () => {
                     </div>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-                    <div className={`p-3 rounded-lg ${stats.pending > 0 ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400'}`}>
-                        <AlertCircle size={24} />
+                    <div className={`p-3 rounded-lg ${stats.pending > 0 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                        {stats.pending > 0 ? <Ban size={24} /> : <CheckCircle size={24} />}
                     </div>
                     <div>
-                        <p className="text-xs text-gray-500 font-bold uppercase">In Attesa</p>
+                        <p className="text-xs text-gray-500 font-bold uppercase">Sospesi/In Attesa</p>
                         <p className="text-2xl font-bold text-gray-800">{stats.pending}</p>
                     </div>
                 </div>
@@ -147,7 +151,7 @@ const AdminPanel = () => {
                         <thead className="bg-gray-50 text-gray-500 uppercase text-xs font-bold">
                             <tr>
                                 <th className="px-6 py-4 border-b border-gray-200 w-1/3">Utente</th>
-                                <th className="px-6 py-4 border-b border-gray-200">Stato</th>
+                                <th className="px-6 py-4 border-b border-gray-200">Accesso</th>
                                 <th className="px-6 py-4 border-b border-gray-200">Ruolo</th>
                                 <th className="px-6 py-4 border-b border-gray-200">Licenza</th>
                                 <th className="px-6 py-4 text-right border-b border-gray-200">Azioni</th>
@@ -177,19 +181,24 @@ const AdminPanel = () => {
                                         </div>
                                     </td>
 
-                                    {/* Approvazione */}
+                                    {/* Stato Approvazione (Accesso) */}
                                     <td className="px-6 py-4">
                                         {u.is_approved ? (
-                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                                                Attivo
-                                            </span>
+                                            <button
+                                                onClick={() => handleToggleApproval(u)}
+                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all group/status"
+                                                title="Clicca per Sospendere"
+                                            >
+                                                <span className="block group-hover/status:hidden">Attivo</span>
+                                                <span className="hidden group-hover/status:block">Sospendi</span>
+                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 group-hover/status:bg-red-500"></div>
+                                            </button>
                                         ) : (
                                             <button 
-                                                onClick={() => handleApprove(u)}
-                                                className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-bold hover:bg-amber-200 transition-colors border border-amber-200 shadow-sm"
+                                                onClick={() => handleToggleApproval(u)}
+                                                className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold hover:bg-emerald-100 hover:text-emerald-700 transition-colors border border-red-200 shadow-sm"
                                             >
-                                                <AlertCircle size={12} /> Approva Ora
+                                                <Ban size={12} /> Sospeso
                                             </button>
                                         )}
                                     </td>
@@ -209,7 +218,7 @@ const AdminPanel = () => {
                                         </button>
                                     </td>
 
-                                    {/* Licenza (Dropdown Simulato con pulsanti per chiarezza) */}
+                                    {/* Licenza */}
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
                                             <select 
@@ -232,7 +241,6 @@ const AdminPanel = () => {
                                                 <option value="expired">Scaduto</option>
                                             </select>
                                             
-                                            {/* Icona indicativa a sinistra della select */}
                                             <div className="absolute ml-2 pointer-events-none">
                                                 {u.subscription_status === 'elite' && <Crown size={12} className="text-amber-600" />}
                                                 {u.subscription_status === 'pro' && <Star size={12} className="text-indigo-600" />}
