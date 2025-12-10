@@ -8,6 +8,7 @@ import ManageClients from './components/ManageClients';
 import Billing from './components/Billing';
 import AdminPanel from './components/AdminPanel';
 import Auth from './components/Auth';
+import DatabaseSetup from './components/DatabaseSetup';
 import * as DB from './services/db';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { Plus, Lock, LogOut, Loader2, Database, Github, AlertTriangle } from 'lucide-react';
@@ -15,6 +16,7 @@ import { Plus, Lock, LogOut, Loader2, Database, Github, AlertTriangle } from 'lu
 function App() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
+  const [showDbSetup, setShowDbSetup] = useState(false);
 
   const [view, setView] = useState<AppView>(AppView.TIMESHEET);
   const [entries, setEntries] = useState<TimeEntry[]>([]);
@@ -112,6 +114,13 @@ function App() {
           p = await DB.createUserProfile(user.id, user.email);
       }
 
+      // Se dopo il tentativo è ancora null, significa che il DB non è configurato (RLS o Tabelle mancanti)
+      if (!p) {
+          setShowDbSetup(true);
+          setLoadingAuth(false);
+          return;
+      }
+
       setProfile(p);
       setLoadingAuth(false);
   };
@@ -137,6 +146,7 @@ function App() {
       setEntries([]);
       setProjects([]);
       setView(AppView.TIMESHEET);
+      setShowDbSetup(false);
   };
 
   // Handlers
@@ -182,6 +192,10 @@ function App() {
 
   if (loadingAuth) {
       return <div className="h-screen flex items-center justify-center bg-gray-50 text-indigo-600"><Loader2 className="animate-spin w-8 h-8"/></div>;
+  }
+  
+  if (showDbSetup) {
+      return <DatabaseSetup />;
   }
 
   if (!profile) {
