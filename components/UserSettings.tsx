@@ -30,11 +30,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ user }) => {
     const totalTrialDays = 60;
     const progress = Math.max(0, Math.min(100, ((totalTrialDays - daysLeft) / totalTrialDays) * 100));
 
-    const handleUpgrade = (planName: string) => {
-        alert(`Procedura di upgrade al piano ${planName} (${billingCycle === 'annual' ? 'Annuale' : 'Mensile'}) avviata.\nQui si aprirà il gateway di pagamento (Stripe/PayPal).`);
-    };
-
-    // Definiamo i piani disponibili per l'acquisto (Elite rimosso, solo per Admin)
+    // Definiamo i piani prima per poter accedere ai prezzi nell'handler
     const plans = [
         {
             id: 'trial',
@@ -62,6 +58,13 @@ const UserSettings: React.FC<UserSettingsProps> = ({ user }) => {
             icon: <Star className="text-indigo-500 fill-indigo-500" />
         }
     ];
+
+    const handleUpgrade = (planName: string) => {
+        const selectedPlan = plans.find(p => p.name === planName);
+        const price = billingCycle === 'annual' ? selectedPlan?.annualPrice : selectedPlan?.price;
+        
+        alert(`Integrazione PayPal in arrivo.\n\nStai per acquistare il piano ${planName} (${billingCycle === 'annual' ? 'Annuale' : 'Mensile'}) a ${price}.\n\nReindirizzamento al gateway sicuro PayPal...`);
+    };
 
     return (
         <div className="animate-fade-in space-y-8 pb-12">
@@ -241,7 +244,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ user }) => {
                     <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-600">
                         <div className="flex items-center gap-3">
                             <CreditCard className="text-gray-400" />
-                            <span>Pagamenti sicuri e crittografati tramite Stripe.</span>
+                            <span>Pagamenti sicuri e crittografati tramite PayPal.</span>
                         </div>
                         <a href="#" className="text-indigo-600 font-bold hover:underline">Scarica Fatture Precedenti</a>
                     </div>

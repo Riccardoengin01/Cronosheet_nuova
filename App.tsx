@@ -127,11 +127,27 @@ function App() {
   };
 
   const handleManualEntryClick = () => {
+    // 1. Check Projects
     if (projects.length === 0) {
         alert("Devi prima creare almeno una postazione/cliente.");
         setView(AppView.CLIENTS);
         return;
     }
+
+    // 2. Check Limits (Start/Trial Plan max 15 entries)
+    if (profile?.subscription_status === 'trial' && entries.length >= 15) {
+        const confirmUpgrade = window.confirm(
+            "⚠️ Limite Raggiunto\n\n" +
+            "Il piano Start (Trial) consente un massimo di 15 voci di registro.\n" +
+            "Hai raggiunto il limite.\n\n" +
+            "Vuoi passare al piano Pro per inserimenti illimitati?"
+        );
+        if (confirmUpgrade) {
+            setView(AppView.SETTINGS);
+        }
+        return;
+    }
+
     setEditingEntry(undefined);
     setIsModalOpen(true);
   };
@@ -158,8 +174,8 @@ function App() {
   };
 
   const handleRenewSubscription = () => {
-      alert("Reindirizzamento al portale pagamenti in corso...");
-      // Qui andrebbe l'integrazione con Stripe
+      alert("Reindirizzamento al portale pagamenti PayPal...");
+      // Qui andrebbe l'integrazione con PayPal
   };
 
   // --- RENDER LOGIC ---
@@ -245,7 +261,7 @@ function App() {
                           onClick={handleRenewSubscription}
                           className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-xl font-bold text-lg shadow-xl shadow-indigo-200 transition-all active:scale-95 flex items-center justify-center gap-2"
                       >
-                          <CreditCard size={20} /> Rinnova Abbonamento
+                          <CreditCard size={20} /> Rinnova con PayPal
                       </button>
                       
                       <button 
@@ -278,7 +294,10 @@ function App() {
                     <h1 className="text-3xl font-bold text-gray-800">Registro Servizi</h1>
                     {demoMode && <span className="inline-block mt-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded border border-orange-200">MODALITÀ DEMO</span>}
                 </div>
-                <button onClick={handleManualEntryClick} className="flex items-center justify-center gap-2 text-base font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-6 py-3 rounded-xl transition-all shadow-lg shadow-indigo-200 active:scale-95">
+                <button 
+                    onClick={handleManualEntryClick}
+                    className="flex items-center justify-center gap-2 text-base font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-6 py-3 rounded-xl transition-all shadow-lg shadow-indigo-200 active:scale-95"
+                >
                     <Plus size={20} /> Aggiungi Servizio
                 </button>
              </div>
