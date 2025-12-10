@@ -166,64 +166,6 @@ function App() {
       }
   };
 
-  const getExpirationInfo = () => {
-    if (!profile) return null;
-
-    const endDate = new Date(profile.trial_ends_at);
-    const now = new Date();
-    const diffTime = endDate.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    // STATUS ELITE
-    if (profile.subscription_status === 'elite') {
-        return (
-            <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-700 rounded-full border border-amber-200 shadow-sm">
-                <Crown size={14} fill="currentColor" />
-                <span className="text-xs font-bold uppercase tracking-wide">Elite Member</span>
-            </div>
-        );
-    }
-
-    // STATUS PRO
-    if (profile.subscription_status === 'pro') {
-        // Mostra scadenza solo se negli ultimi 30 giorni
-        if (diffDays <= 30 && diffDays > 0) {
-             return (
-                <div className="flex items-center gap-2">
-                     <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full border border-indigo-200 shadow-sm">
-                        <Star size={14} fill="currentColor" />
-                        <span className="text-xs font-bold uppercase">Pro</span>
-                    </div>
-                    <span className="text-xs font-medium text-indigo-600 bg-white px-2 py-0.5 rounded border border-indigo-100">
-                        Rinnovo tra {diffDays} gg
-                    </span>
-                </div>
-            );
-        }
-        // Altrimenti solo badge Pro
-        return (
-            <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full border border-indigo-200 shadow-sm">
-                <Star size={14} fill="currentColor" />
-                <span className="text-xs font-bold uppercase tracking-wide">Pro Plan</span>
-            </div>
-        );
-    }
-
-    // STATUS TRIAL (Default)
-    const isExpired = diffDays < 0;
-    return (
-        <div className="flex flex-col items-end">
-             <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 rounded-full border border-blue-100 shadow-sm mb-1">
-                <Clock size={14} />
-                <span className="text-xs font-bold uppercase tracking-wide">Trial</span>
-            </div>
-            <span className={`text-[10px] font-mono font-medium ${isExpired ? 'text-red-500' : 'text-slate-500'}`}>
-                {isExpired ? 'Scaduto' : `Scade: ${endDate.toLocaleDateString()}`} ({diffDays > 0 ? diffDays : 0}gg)
-            </span>
-        </div>
-    );
-  };
-
   // --- RENDER LOGIC ---
 
   // Schermata "Database non collegato" con opzione Demo
@@ -378,29 +320,19 @@ function App() {
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
-      <Sidebar currentView={view} onChangeView={setView} userRole={profile.role} />
+      <Sidebar currentView={view} onChangeView={setView} userProfile={profile} />
       
       <main className="flex-1 overflow-y-auto relative scroll-smooth bg-gray-50/50">
           {/* Header Mobile / User Info */}
           <div className="absolute top-4 right-4 z-50 flex items-center gap-4">
-               {/* User Badge Info */}
-               <div className="hidden md:flex flex-col items-end mr-2">
-                   {getExpirationInfo()}
-               </div>
-
-               <div className="text-right hidden md:block">
-                   <div className="flex items-center justify-end gap-2">
-                       <p className="text-sm font-bold text-gray-800">{profile.email}</p>
-                       {profile.role === 'admin' && (
-                           <span title="Amministratore" className="bg-amber-100 p-1 rounded-full text-amber-600 border border-amber-200">
-                               <Crown size={14} fill="currentColor" />
-                           </span>
-                       )}
-                   </div>
-               </div>
-               
-               <button onClick={handleLogout} className="bg-white p-2 rounded-lg shadow-sm text-gray-500 hover:text-red-500 transition-colors" title="Esci">
+               {/* Mobile only logout as sidebar handles destop */}
+               <button onClick={handleLogout} className="bg-white p-2 rounded-lg shadow-sm text-gray-500 hover:text-red-500 transition-colors md:hidden" title="Esci">
                    <LogOut size={20} />
+               </button>
+               
+               {/* Desktop Logout handled in Sidebar or extra button here if needed, keeping simple */}
+               <button onClick={handleLogout} className="hidden md:block bg-white p-2 rounded-lg shadow-sm text-slate-400 hover:text-red-500 transition-colors border border-gray-100" title="Disconnetti">
+                   <LogOut size={18} />
                </button>
           </div>
 
