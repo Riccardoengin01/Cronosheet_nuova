@@ -1,10 +1,36 @@
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Project, TimeEntry, UserProfile } from '../types';
+import { generateId, COLORS } from '../utils';
+
+// --- MOCK DATA FOR DEMO MODE ---
+const MOCK_DELAY = 500;
+const LOCAL_STORAGE_KEYS = {
+    PROJECTS: 'cronosheet_demo_projects',
+    ENTRIES: 'cronosheet_demo_entries',
+    PROFILES: 'cronosheet_demo_profiles'
+};
+
+const getLocal = (key: string) => JSON.parse(localStorage.getItem(key) || '[]');
+const setLocal = (key: string, data: any) => localStorage.setItem(key, JSON.stringify(data));
 
 // --- PROJECTS ---
 
 export const getProjects = async (userId?: string): Promise<Project[]> => {
-  // RLS filters by user automatically via auth token, userId param is technically redundant for security but useful for logic
+  if (!isSupabaseConfigured) {
+      await new Promise(r => setTimeout(r, MOCK_DELAY));
+      const all = getLocal(LOCAL_STORAGE_KEYS.PROJECTS);
+      // In demo mode, return defaults if empty
+      if (all.length === 0) {
+          const defaults = [
+              { id: 'p1', user_id: userId, name: 'Demo Cliente A', color: COLORS[0], defaultHourlyRate: 20, shifts: [] },
+              { id: 'p2', user_id: userId, name: 'Demo Cantiere B', color: COLORS[2], defaultHourlyRate: 15, shifts: [] }
+          ];
+          setLocal(LOCAL_STORAGE_KEYS.PROJECTS, defaults);
+          return defaults;
+      }
+      return all.filter((p: any) => p.user_id === userId);
+  }
+
   const { data, error } = await supabase
     .from('projects')
     .select('*')
@@ -15,7 +41,6 @@ export const getProjects = async (userId?: string): Promise<Project[]> => {
     return [];
   }
 
-  // Map DB columns (snake_case) to TS interface (camelCase)
   return data.map((p: any) => ({
     ...p,
     defaultHourlyRate: p.default_hourly_rate
@@ -23,9 +48,19 @@ export const getProjects = async (userId?: string): Promise<Project[]> => {
 };
 
 export const saveProject = async (project: Project, userId: string): Promise<Project | null> => {
-  // Prepare object for DB (snake_case)
+  if (!isSupabaseConfigured) {
+      await new Promise(r => setTimeout(r, MOCK_DELAY));
+      const all = getLocal(LOCAL_STORAGE_KEYS.PROJECTS);
+      const newProj = { ...project, user_id: userId };
+      const idx = all.findIndex((p: any) => p.id === project.id);
+      if (idx >= 0) all[idx] = newProj;
+      else all.push(newProj);
+      setLocal(LOCAL_STORAGE_KEYS.PROJECTS, all);
+      return newProj;
+  }
+
   const dbProject = {
-    id: project.id, // Supabase will use this ID or generate one if strictly needed, but better to let client gen ID or use upsert
+    id: project.id,
     user_id: userId,
     name: project.name,
     color: project.color,
@@ -51,6 +86,11 @@ export const saveProject = async (project: Project, userId: string): Promise<Pro
 };
 
 export const deleteProject = async (id: string) => {
+  if (!isSupabaseConfigured) {
+      const all = getLocal(LOCAL_STORAGE_KEYS.PROJECTS).filter((p: any) => p.id !== id);
+      setLocal(LOCAL_STORAGE_KEYS.PROJECTS, all);
+      return;
+  }
   const { error } = await supabase.from('projects').delete().eq('id', id);
   if (error) console.error('Error deleting project:', error);
 };
@@ -58,6 +98,11 @@ export const deleteProject = async (id: string) => {
 // --- ENTRIES ---
 
 export const getEntries = async (userId?: string): Promise<TimeEntry[]> => {
+  if (!isSupabaseConfigured) {
+      await new Promise(r => setTimeout(r, MOCK_DELAY));
+      return getLocal(LOCAL_STORAGE_KEYS.ENTRIES).filter((e: any) => e.user_id === userId).sort((a: any, b: any) => b.startTime - a.startTime);
+  }
+
   const { data, error } = await supabase
     .from('time_entries')
     .select('*')
@@ -83,6 +128,17 @@ export const getEntries = async (userId?: string): Promise<TimeEntry[]> => {
 };
 
 export const saveEntry = async (entry: TimeEntry, userId: string): Promise<TimeEntry | null> => {
+  if (!isSupabaseConfigured) {
+      await new Promise(r => setTimeout(r, MOCK_DELAY));
+      const all = getLocal(LOCAL_STORAGE_KEYS.ENTRIES);
+      const newEntry = { ...entry, user_id: userId };
+      const idx = all.findIndex((e: any) => e.id === entry.id);
+      if (idx >= 0) all[idx] = newEntry;
+      else all.push(newEntry);
+      setLocal(LOCAL_STORAGE_KEYS.ENTRIES, all);
+      return newEntry;
+  }
+
   const dbEntry = {
     id: entry.id,
     user_id: userId,
@@ -111,6 +167,11 @@ export const saveEntry = async (entry: TimeEntry, userId: string): Promise<TimeE
 };
 
 export const deleteEntry = async (id: string) => {
+  if (!isSupabaseConfigured) {
+      const all = getLocal(LOCAL_STORAGE_KEYS.ENTRIES).filter((e: any) => e.id !== id);
+      setLocal(LOCAL_STORAGE_KEYS.ENTRIES, all);
+      return;
+  }
   const { error } = await supabase.from('time_entries').delete().eq('id', id);
   if (error) console.error('Error deleting entry:', error);
 };
@@ -118,6 +179,11 @@ export const deleteEntry = async (id: string) => {
 // --- PROFILES / ADMIN ---
 
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
+  if (!isSupabaseConfigured) {
+      const profiles = getLocal(LOCAL_STORAGE_KEYS.PROFILES);
+      return profiles.find((p: any) => p.id === userId) || null;
+  }
+
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
@@ -129,17 +195,31 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
 };
 
 export const createUserProfile = async (userId: string, email: string): Promise<UserProfile | null> => {
-    // Check if profile already exists to avoid duplicate key error
+    if (!isSupabaseConfigured) {
+        const profiles = getLocal(LOCAL_STORAGE_KEYS.PROFILES);
+        const newProfile: UserProfile = {
+            id: userId,
+            email: email,
+            role: 'admin', // Default to admin in demo mode for ease
+            subscription_status: 'trial',
+            trial_ends_at: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+            is_approved: true
+        };
+        profiles.push(newProfile);
+        setLocal(LOCAL_STORAGE_KEYS.PROFILES, profiles);
+        return newProfile;
+    }
+
     const existing = await getUserProfile(userId);
     if (existing) return existing;
 
     const newProfile = {
         id: userId,
         email: email,
-        role: 'user', // Default role
+        role: 'user',
         subscription_status: 'trial',
-        trial_ends_at: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(), // 60 days trial
-        is_approved: false // Requires admin approval
+        trial_ends_at: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+        is_approved: false
     };
 
     const { data, error } = await supabase
@@ -156,7 +236,9 @@ export const createUserProfile = async (userId: string, email: string): Promise<
 };
 
 export const getAllProfiles = async (): Promise<UserProfile[]> => {
-    // This will only return all profiles if the logged-in user is an admin due to RLS
+    if (!isSupabaseConfigured) {
+        return getLocal(LOCAL_STORAGE_KEYS.PROFILES);
+    }
     const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
     if (error) {
         console.error("Error fetching all profiles", error);
@@ -166,6 +248,16 @@ export const getAllProfiles = async (): Promise<UserProfile[]> => {
 };
 
 export const updateUserProfileAdmin = async (profile: Partial<UserProfile> & { id: string }) => {
+    if (!isSupabaseConfigured) {
+        const profiles = getLocal(LOCAL_STORAGE_KEYS.PROFILES);
+        const idx = profiles.findIndex((p: any) => p.id === profile.id);
+        if (idx >= 0) {
+            profiles[idx] = { ...profiles[idx], ...profile };
+            setLocal(LOCAL_STORAGE_KEYS.PROFILES, profiles);
+        }
+        return;
+    }
+
     const { error } = await supabase
         .from('profiles')
         .update({
@@ -179,11 +271,11 @@ export const updateUserProfileAdmin = async (profile: Partial<UserProfile> & { i
 };
 
 export const deleteUserAdmin = async (userId: string) => {
-    // In Supabase, deleting from auth.users requires Service Role key usually, 
-    // but we can delete the profile row which might cascade if configured, 
-    // or simply disable them. For this SaaS boilerplate, we delete the profile data.
-    // Note: To truly delete auth user, you need Edge Functions or Service Role.
-    // Here we just delete the profile record.
+    if (!isSupabaseConfigured) {
+        const profiles = getLocal(LOCAL_STORAGE_KEYS.PROFILES).filter((p: any) => p.id !== userId);
+        setLocal(LOCAL_STORAGE_KEYS.PROFILES, profiles);
+        return;
+    }
     const { error } = await supabase.from('profiles').delete().eq('id', userId);
     if (error) throw error;
 };
