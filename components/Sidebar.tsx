@@ -1,6 +1,6 @@
 import React from 'react';
 import { AppView, UserProfile } from '../types';
-import { Table2, PieChart, ShieldCheck, Users, Receipt, Shield } from 'lucide-react';
+import { Table2, PieChart, ShieldCheck, Users, Receipt, Shield, Github } from 'lucide-react';
 
 interface SidebarProps {
   currentView: AppView;
@@ -54,7 +54,28 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userRole }
       <div className="p-4 border-t border-slate-800">
         <div className="bg-slate-800 rounded-lg p-3 hidden lg:block">
             <p className="text-xs text-slate-500 mb-1">{userRole === 'admin' ? 'Amministratore' : 'Utente'}</p>
-            <p className="text-sm font-medium truncate opacity-70">Cronosheet v2.1</p>
+            <div className="flex justify-between items-center">
+                <p className="text-sm font-medium truncate opacity-70">Cronosheet v2.1</p>
+                <a 
+                    href="https://github.com/Riccardoengin01/Cronosheet" 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="text-slate-500 hover:text-white transition-colors"
+                    title="View on GitHub"
+                >
+                    <Github size={14} />
+                </a>
+            </div>
+        </div>
+        <div className="lg:hidden flex justify-center mt-2">
+            <a 
+                href="https://github.com/Riccardoengin01/Cronosheet" 
+                target="_blank" 
+                rel="noreferrer"
+                className="text-slate-500 hover:text-white"
+            >
+                <Github size={20} />
+            </a>
         </div>
       </div>
     </aside>

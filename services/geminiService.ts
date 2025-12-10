@@ -3,17 +3,20 @@ import { TimeEntry, Project } from "../types";
 import { formatDurationHuman, formatDate } from "../utils";
 
 const getAI = () => {
-    const apiKey = process.env.API_KEY;
+    // Supporto doppio per compatibilità massima (Vercel/Vite)
+    const apiKey = process.env.API_KEY || (import.meta as any).env?.VITE_GOOGLE_API_KEY;
+    
     if (!apiKey) {
-        console.error("API Key not found");
+        console.error("API Key (VITE_GOOGLE_API_KEY) not found in environment variables.");
         return null;
     }
+    // Nota: Passiamo apiKey esplicitamente anche se la libreria potrebbe cercarla in process.env
     return new GoogleGenAI({ apiKey });
 }
 
 export const analyzeTimeData = async (entries: TimeEntry[], projects: Project[]) => {
     const ai = getAI();
-    if (!ai) return "Error: Missing API Key.";
+    if (!ai) return "Errore Configurazione: Manca la Chiave API di Google (VITE_GOOGLE_API_KEY). Controlla le impostazioni di Vercel.";
 
     // Prepare data summary
     const projectMap = new Map(projects.map(p => [p.id, p.name]));

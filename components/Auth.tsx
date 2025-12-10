@@ -22,16 +22,22 @@ const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
 
     try {
       if (isSignUp) {
+        // CORREZIONE QUI: Aggiungiamo emailRedirectTo
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            emailRedirectTo: window.location.origin // Reindirizza all'URL attuale (Vercel)
+          }
         });
+
         if (error) throw error;
+        
         // Check if user already exists but fake confirm
         if (data.user && data.user.identities && data.user.identities.length === 0) {
              setMessage({ type: 'error', text: 'Utente già registrato. Prova ad accedere.' });
         } else {
-             setMessage({ type: 'success', text: 'Registrazione inviata! Se richiesto, controlla la tua email per confermare, poi attendi approvazione admin.' });
+             setMessage({ type: 'success', text: 'Registrazione inviata! Controlla la tua email e clicca sul link per confermare.' });
              setIsSignUp(false);
         }
       } else {

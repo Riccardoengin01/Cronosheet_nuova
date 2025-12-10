@@ -2,38 +2,41 @@
 
 Un'applicazione moderna per la gestione delle ore, turni e fatturazione, con supporto multi-utente e sicurezza dei dati tramite Supabase.
 
-## 🚀 Come Pubblicare (Deployment)
+## 🚀 Guida alla Pubblicazione (Vercel + Supabase)
 
-### 1. Preparazione Database (Supabase)
-1. Vai su [Supabase.com](https://supabase.com) e crea un nuovo progetto.
-2. Una volta pronto, vai su **SQL Editor** ed esegui lo script SQL fornito (vedi sotto o chiedi all'assistente AI di generarlo di nuovo se lo hai perso). Questo creerà le tabelle e le regole di sicurezza (RLS).
-3. Vai su **Project Settings > API**. Copia:
-   - `Project URL`
-   - `anon public` key
+### 1. Configura Supabase (Database)
+1. Vai su [Supabase.com](https://supabase.com) e crea un progetto.
+2. Vai su **SQL Editor** e incolla lo script SQL per creare le tabelle (fornito separatamente).
+3. Vai su **Settings (icona ingranaggio) > API**.
+4. Tieni aperta questa pagina, ti serviranno:
+   - **Project URL**
+   - **anon public key**
 
-### 2. Pubblicazione su GitHub
-1. Crea un nuovo repository su GitHub.
-2. Carica tutti i file di questo progetto.
+### 2. Configura Vercel (Hosting)
+1. Carica questo codice su **GitHub**.
+2. Vai su [Vercel](https://vercel.com), fai "Add New Project" e seleziona il tuo repository GitHub.
+3. **PRIMA** di cliccare Deploy, trova la sezione **Environment Variables**.
+4. Aggiungi queste 3 variabili (copia i nomi ESATTI):
 
-### 3. Pubblicazione su Vercel
-1. Vai su [Vercel](https://vercel.com) e clicca "Add New > Project".
-2. Importa il repository GitHub appena creato.
-3. Nella sezione **Environment Variables**, aggiungi queste due variabili con i dati presi da Supabase:
-   - `VITE_SUPABASE_URL`: (Il tuo URL Supabase)
-   - `VITE_SUPABASE_KEY`: (La tua chiave anon)
-4. Clicca **Deploy**.
+| Nome Variabile (Key) | Valore (Value) | Dove lo trovo? |
+|----------------------|----------------|----------------|
+| `VITE_SUPABASE_URL` | `https://...` | Supabase > Settings > API > Project URL |
+| `VITE_SUPABASE_KEY` | `eyJh...` | Supabase > Settings > API > Project API Keys (anon) |
+| `VITE_GOOGLE_API_KEY` | `AIza...` | Google AI Studio (API Key) |
+
+5. Clicca **Deploy**.
+
+## 🔐 Credenziali Admin
+Il primo utente che registri sarà un utente "base". Per renderlo amministratore:
+1. Vai su Supabase > Table Editor > tabella `profiles`.
+2. Trova la riga del tuo utente.
+3. Modifica la colonna `role` in `admin`.
+4. Modifica la colonna `is_approved` in `TRUE`.
 
 ## 🛠 Sviluppo Locale
-Se vuoi testare in locale, crea un file `.env` nella root del progetto:
-
+Se lavori sul tuo computer, crea un file `.env` nella cartella principale:
+```ini
+VITE_SUPABASE_URL=https://tuo-url.supabase.co
+VITE_SUPABASE_KEY=tua-chiave-anon
+VITE_GOOGLE_API_KEY=tua-chiave-google
 ```
-VITE_SUPABASE_URL=https://tuo-progetto.supabase.co
-VITE_SUPABASE_KEY=tua-chiave-anon-public
-```
-
-## 🔐 Credenziali Admin Iniziali
-Dopo aver creato il database, il primo utente che si registra sarà un utente normale.
-Per renderlo Admin:
-1. Vai su Supabase > Table Editor > `profiles`.
-2. Trova il tuo utente e cambia la colonna `role` da `user` a `admin`.
-3. Cambia `is_approved` a `TRUE`.

@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { Project, TimeEntry } from '../types';
 import { analyzeTimeData } from '../services/geminiService';
-import { Bot, Sparkles, AlertCircle } from 'lucide-react';
-import ReactMarkdown from 'react-markdown'; // Actually, let's stick to simple text display to avoid extra dependencies, or format simply.
-// I will not use ReactMarkdown to keep it dependency-light as per instructions, I will parse newlines.
+import { Bot, Sparkles, XCircle } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 interface AIAssistantProps {
   entries: TimeEntry[];
@@ -58,20 +57,21 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ entries, projects }) => {
 
             {analysis && (
                 <div className="bg-white/95 text-slate-800 rounded-xl p-6 shadow-2xl backdrop-blur-sm border border-white/20 animate-slide-up">
-                    <div className="prose prose-sm max-w-none">
-                        <h3 className="text-lg font-bold text-indigo-700 mb-3 flex items-center gap-2">
+                    <div className="flex justify-between items-start mb-3">
+                        <h3 className="text-lg font-bold text-indigo-700 flex items-center gap-2">
                             <Sparkles className="w-4 h-4" /> AI Analysis
                         </h3>
-                        <div className="whitespace-pre-line leading-relaxed text-slate-700">
-                            {analysis}
-                        </div>
+                        <button 
+                            onClick={() => setAnalysis(null)}
+                            className="text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                            <XCircle size={20} />
+                        </button>
                     </div>
-                    <button 
-                        onClick={() => setAnalysis(null)}
-                        className="mt-6 text-sm text-indigo-600 hover:text-indigo-800 font-medium underline decoration-transparent hover:decoration-indigo-800 transition-all"
-                    >
-                        Clear Analysis
-                    </button>
+                    
+                    <div className="prose prose-sm max-w-none text-slate-700 leading-relaxed">
+                        <ReactMarkdown>{analysis}</ReactMarkdown>
+                    </div>
                 </div>
             )}
         </div>
