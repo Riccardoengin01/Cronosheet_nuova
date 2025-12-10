@@ -8,16 +8,13 @@ import ManageClients from './components/ManageClients';
 import Billing from './components/Billing';
 import AdminPanel from './components/AdminPanel';
 import Auth from './components/Auth';
-import DatabaseSetup from './components/DatabaseSetup';
 import * as DB from './services/db';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
-import { Plus, Lock, LogOut, Loader2, Database, Github, Crown, Star, Play, AlertCircle, Clock } from 'lucide-react';
-import { generateId } from './utils';
+import { Plus, Lock, LogOut, Loader2, Database, Play } from 'lucide-react';
 
 function App() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
-  const [showDbSetup, setShowDbSetup] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
 
   const [view, setView] = useState<AppView>(AppView.TIMESHEET);
@@ -32,7 +29,7 @@ function App() {
   // 0. Environment Check & Demo Logic
   useEffect(() => {
     if (!isSupabaseConfigured && !demoMode) {
-        // Stop loading and let the UI show the Setup/Demo screen
+        // Stop loading and let the UI show the Demo screen
         setLoadingAuth(false);
     } else if (demoMode) {
         // Initialize Demo User
@@ -43,7 +40,6 @@ function App() {
   const initializeDemo = async () => {
       setLoadingAuth(true);
       const demoId = 'demo-user-1';
-      // Create or get demo profile
       const p = await DB.createUserProfile(demoId, 'demo@cronosheet.com');
       if (p) {
           setProfile(p);
@@ -52,7 +48,7 @@ function App() {
       setLoadingAuth(false);
   };
 
-  // 1. Real Auth Check (only if configured and not in demo)
+  // 1. Real Auth Check
   useEffect(() => {
     if (!isSupabaseConfigured || demoMode) return;
 
@@ -81,13 +77,14 @@ function App() {
   const fetchUserProfile = async (user: { id: string, email?: string }) => {
       let p = await DB.getUserProfile(user.id);
       
+      // Se non esiste, prova a crearlo (caso fallback se trigger fallisce o ritarda)
       if (!p && user.email) {
-          console.log("Profilo mancante. Tentativo di creazione automatica...");
+          console.log("Profilo mancante. Creazione fallback...");
           p = await DB.createUserProfile(user.id, user.email);
       }
 
+      // Se ancora null, c'è un problema grave di DB
       if (!p) {
-          setShowDbSetup(true);
           setLoadingAuth(false);
           return;
       }
@@ -124,7 +121,6 @@ function App() {
       setEntries([]);
       setProjects([]);
       setView(AppView.TIMESHEET);
-      setShowDbSetup(false);
   };
 
   // Handlers
@@ -168,21 +164,6 @@ function App() {
 
   // --- RENDER LOGIC ---
 
-  // Selettore Setup DB (Overlay)
-  const renderDbSetupOverlay = () => {
-      if (!showDbSetup) return null;
-      return (
-          <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4">
-              <div className="w-full max-w-4xl max-h-[95vh] overflow-y-auto bg-white rounded-2xl relative">
-                  <button onClick={() => setShowDbSetup(false)} className="absolute top-4 right-4 bg-slate-100 p-2 rounded-full hover:bg-slate-200 z-10">
-                      <LogOut size={20}/>
-                  </button>
-                  <DatabaseSetup />
-              </div>
-          </div>
-      );
-  };
-
   // Schermata "Database non collegato" con opzione Demo
   if (!isSupabaseConfigured && !demoMode && !loadingAuth) {
       return (
@@ -197,7 +178,7 @@ function App() {
                   <div>
                     <h1 className="text-3xl font-bold text-slate-800 mb-2">Benvenuto in Cronosheet</h1>
                     <p className="text-slate-500 text-lg">
-                        L'applicazione non è ancora collegata al cloud.
+                        L'applicazione non è collegata alle variabili d'ambiente.
                     </p>
                   </div>
                   
@@ -206,7 +187,7 @@ function App() {
                           <Play className="w-5 h-5 fill-indigo-600 text-indigo-600" /> Anteprima Immediata
                       </h3>
                       <p className="text-indigo-700 mb-4 text-sm leading-relaxed">
-                          Puoi avviare l'applicazione in <strong>Modalità Demo</strong>. I dati verranno salvati temporaneamente nel tuo browser. Ideale per testare l'interfaccia.
+                          Puoi avviare l'applicazione in <strong>Modalità Demo</strong>. I dati verranno salvati temporaneamente nel tuo browser.
                       </p>
                       <button 
                         onClick={() => setDemoMode(true)}
@@ -215,17 +196,7 @@ function App() {
                           Avvia Modalità Demo
                       </button>
                   </div>
-
-                  <div className="border-t border-slate-100 pt-6">
-                      <button 
-                         onClick={() => setShowDbSetup(true)}
-                         className="text-slate-400 hover:text-slate-600 text-sm font-medium flex items-center justify-center gap-1 mx-auto"
-                      >
-                          <Database size={14} /> Voglio collegare il Database Reale
-                      </button>
-                  </div>
               </div>
-              {renderDbSetupOverlay()}
           </div>
       );
   }
@@ -237,14 +208,8 @@ function App() {
       </div>;
   }
   
-  // Se non c'è profilo, mostra Auth o Setup se richiesto esplicitamente
   if (!profile) {
-      return (
-          <>
-            <Auth onLoginSuccess={() => {}} />
-            {renderDbSetupOverlay()}
-          </>
-      );
+      return <Auth onLoginSuccess={() => {}} />;
   }
 
   // Blocco se non approvato
@@ -261,18 +226,12 @@ function App() {
                   </p>
                   <div className="bg-indigo-50 p-4 rounded-lg text-xs text-left mb-6 text-indigo-800">
                       <strong>ID Utente:</strong> <span className="font-mono">{profile.id}</span><br/>
-                      <strong>Stato:</strong> In attesa di verifica manuale.
+                      <strong>Stato:</strong> In attesa di verifica manuale da parte dell'Admin.
                   </div>
-                  <button onClick={handleLogout} className="w-full bg-slate-900 text-white py-2 rounded-lg font-bold hover:bg-slate-800 mb-4">
+                  <button onClick={handleLogout} className="w-full bg-slate-900 text-white py-2 rounded-lg font-bold hover:bg-slate-800">
                       Torna al Login
                   </button>
-                  
-                  {/* SETUP LINK FOR STUCK USERS */}
-                  <button onClick={() => setShowDbSetup(true)} className="text-xs text-slate-400 hover:text-indigo-500 underline">
-                      Sei l'amministratore e sei bloccato qui? Clicca qui.
-                  </button>
               </div>
-              {renderDbSetupOverlay()}
           </div>
       );
   }
@@ -336,19 +295,12 @@ function App() {
         currentView={view} 
         onChangeView={setView} 
         userProfile={profile} 
-        onOpenSetup={() => setShowDbSetup(true)}
       />
       
       <main className="flex-1 overflow-y-auto relative scroll-smooth bg-gray-50/50">
           {/* Header Mobile / User Info */}
           <div className="absolute top-4 right-4 z-50 flex items-center gap-4">
-               {/* Mobile only logout as sidebar handles destop */}
-               <button onClick={handleLogout} className="bg-white p-2 rounded-lg shadow-sm text-gray-500 hover:text-red-500 transition-colors md:hidden" title="Esci">
-                   <LogOut size={20} />
-               </button>
-               
-               {/* Desktop Logout handled in Sidebar or extra button here if needed, keeping simple */}
-               <button onClick={handleLogout} className="hidden md:block bg-white p-2 rounded-lg shadow-sm text-slate-400 hover:text-red-500 transition-colors border border-gray-100" title="Disconnetti">
+               <button onClick={handleLogout} className="bg-white p-2 rounded-lg shadow-sm text-slate-400 hover:text-red-500 transition-colors border border-gray-100" title="Disconnetti">
                    <LogOut size={18} />
                </button>
           </div>
@@ -365,9 +317,6 @@ function App() {
         initialEntry={editingEntry}
         projects={projects}
       />
-      
-      {/* Database Setup Overlay (Global) */}
-      {renderDbSetupOverlay()}
     </div>
   );
 }

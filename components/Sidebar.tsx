@@ -1,15 +1,14 @@
 import React from 'react';
 import { AppView, UserProfile } from '../types';
-import { Table2, PieChart, ShieldCheck, Users, Receipt, Shield, Github, Crown, Star, Clock, LogOut, ChevronRight, Settings, Database } from 'lucide-react';
+import { Table2, PieChart, ShieldCheck, Users, Receipt, Shield, Github, Crown, Star, Clock, ChevronRight } from 'lucide-react';
 
 interface SidebarProps {
   currentView: AppView;
   onChangeView: (view: AppView) => void;
   userProfile: UserProfile | null;
-  onOpenSetup?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userProfile, onOpenSetup }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userProfile }) => {
   const menuItems = [
     { id: AppView.TIMESHEET, label: 'Registro', icon: Table2 },
     { id: AppView.CLIENTS, label: 'Clienti', icon: Users },
@@ -147,18 +146,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userProfil
              </div>
         </div>
         
-        {/* Footer Links / Setup */}
-        <div className="flex justify-between items-center px-1">
-             {onOpenSetup && (
-                <button 
-                    onClick={onOpenSetup} 
-                    className="text-slate-500 hover:text-indigo-400 transition-colors flex items-center gap-1.5"
-                    title="Configurazione Database"
-                >
-                    <Database size={16} />
-                    <span className="hidden lg:inline text-[10px] font-bold">SETUP DB</span>
-                </button>
-             )}
+        {/* Footer Links */}
+        <div className="flex justify-center lg:justify-between items-center px-1">
+            <p className="hidden lg:block text-[10px] text-slate-600">v2.3.0</p>
             <a 
                 href="https://github.com/Riccardoengin01/Cronosheet" 
                 target="_blank" 

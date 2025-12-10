@@ -200,7 +200,7 @@ export const createUserProfile = async (userId: string, email: string): Promise<
         const newProfile: UserProfile = {
             id: userId,
             email: email,
-            role: 'admin', // Default to admin in demo mode for ease
+            role: 'admin', 
             subscription_status: 'trial',
             trial_ends_at: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
             is_approved: true
@@ -210,9 +210,9 @@ export const createUserProfile = async (userId: string, email: string): Promise<
         return newProfile;
     }
 
-    const existing = await getUserProfile(userId);
-    if (existing) return existing;
-
+    // Qui la modifica importante: usiamo UPSERT
+    // Se il profilo esiste già (creato dal trigger), lo aggiorniamo (o non facciamo nulla)
+    // Se non esiste, lo creiamo.
     const newProfile = {
         id: userId,
         email: email,
@@ -224,14 +224,21 @@ export const createUserProfile = async (userId: string, email: string): Promise<
 
     const { data, error } = await supabase
         .from('profiles')
-        .insert([newProfile])
+        .upsert(newProfile, { onConflict: 'id', ignoreDuplicates: true }) // Prova a inserire, se c'è ID, ignora
         .select()
         .single();
     
     if (error) {
-        console.error("Error creating profile:", error);
-        return null;
+        console.error("Error creating/upserting profile:", error);
+        // Fallback: prova a rileggere se upsert ha fallito in modo strano
+        return getUserProfile(userId);
     }
+    
+    // Se upsert ha ignorato (ritorna null a volte su ignoreDuplicates), rileggi
+    if (!data) {
+        return getUserProfile(userId);
+    }
+
     return data;
 };
 
