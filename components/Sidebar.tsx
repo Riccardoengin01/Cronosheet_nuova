@@ -1,14 +1,15 @@
 import React from 'react';
 import { AppView, UserProfile } from '../types';
-import { Table2, PieChart, ShieldCheck, Users, Receipt, Shield, Github, Crown, Star, Clock, LogOut, ChevronRight } from 'lucide-react';
+import { Table2, PieChart, ShieldCheck, Users, Receipt, Shield, Github, Crown, Star, Clock, LogOut, ChevronRight, Settings, Database } from 'lucide-react';
 
 interface SidebarProps {
   currentView: AppView;
   onChangeView: (view: AppView) => void;
   userProfile: UserProfile | null;
+  onOpenSetup?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userProfile }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userProfile, onOpenSetup }) => {
   const menuItems = [
     { id: AppView.TIMESHEET, label: 'Registro', icon: Table2 },
     { id: AppView.CLIENTS, label: 'Clienti', icon: Users },
@@ -114,9 +115,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userProfil
       </nav>
 
       {/* User Info Card (Bottom) */}
-      <div className="p-4 border-t border-slate-800/50 bg-slate-900/50">
+      <div className="p-4 border-t border-slate-800/50 bg-slate-900/50 space-y-3">
+        
+        {/* User Card */}
         <div className="bg-slate-800/40 rounded-xl p-4 hidden lg:block border border-slate-700/30 hover:border-slate-600 transition-colors group cursor-default">
-            
             {/* User Profile Header */}
             <div className="flex items-center gap-3 mb-3">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-inner ${userProfile?.role === 'admin' ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white' : 'bg-slate-700 text-slate-300'}`}>
@@ -132,7 +134,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userProfil
                     </div>
                 </div>
             </div>
-
             {/* Plan Info Details */}
             <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-800">
                 {renderUserStatus()}
@@ -146,9 +147,18 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userProfil
              </div>
         </div>
         
-        {/* Footer Links */}
-        <div className="mt-4 flex justify-center lg:justify-between items-center px-1">
-            <p className="hidden lg:block text-[10px] text-slate-600">v2.1.0</p>
+        {/* Footer Links / Setup */}
+        <div className="flex justify-between items-center px-1">
+             {onOpenSetup && (
+                <button 
+                    onClick={onOpenSetup} 
+                    className="text-slate-500 hover:text-indigo-400 transition-colors flex items-center gap-1.5"
+                    title="Configurazione Database"
+                >
+                    <Database size={16} />
+                    <span className="hidden lg:inline text-[10px] font-bold">SETUP DB</span>
+                </button>
+             )}
             <a 
                 href="https://github.com/Riccardoengin01/Cronosheet" 
                 target="_blank" 

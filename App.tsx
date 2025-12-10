@@ -168,6 +168,21 @@ function App() {
 
   // --- RENDER LOGIC ---
 
+  // Selettore Setup DB (Overlay)
+  const renderDbSetupOverlay = () => {
+      if (!showDbSetup) return null;
+      return (
+          <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4">
+              <div className="w-full max-w-4xl max-h-[95vh] overflow-y-auto bg-white rounded-2xl relative">
+                  <button onClick={() => setShowDbSetup(false)} className="absolute top-4 right-4 bg-slate-100 p-2 rounded-full hover:bg-slate-200 z-10">
+                      <LogOut size={20}/>
+                  </button>
+                  <DatabaseSetup />
+              </div>
+          </div>
+      );
+  };
+
   // Schermata "Database non collegato" con opzione Demo
   if (!isSupabaseConfigured && !demoMode && !loadingAuth) {
       return (
@@ -210,17 +225,7 @@ function App() {
                       </button>
                   </div>
               </div>
-              
-              {showDbSetup && (
-                  <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-                      <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl relative">
-                          <button onClick={() => setShowDbSetup(false)} className="absolute top-4 right-4 bg-slate-100 p-2 rounded-full hover:bg-slate-200">
-                              <LogOut size={20}/>
-                          </button>
-                          <DatabaseSetup />
-                      </div>
-                  </div>
-              )}
+              {renderDbSetupOverlay()}
           </div>
       );
   }
@@ -232,35 +237,42 @@ function App() {
       </div>;
   }
   
-  if (showDbSetup) {
-      return <DatabaseSetup />;
-  }
-
+  // Se non c'è profilo, mostra Auth o Setup se richiesto esplicitamente
   if (!profile) {
-      return <Auth onLoginSuccess={() => {}} />;
+      return (
+          <>
+            <Auth onLoginSuccess={() => {}} />
+            {renderDbSetupOverlay()}
+          </>
+      );
   }
 
   // Blocco se non approvato
   if (!profile.is_approved) {
       return (
-          <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-8 text-center">
+          <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-8 text-center relative">
               <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md">
                   <div className="bg-amber-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                       <Lock className="text-amber-600 w-8 h-8" />
                   </div>
                   <h1 className="text-2xl font-bold text-gray-900 mb-2">Account in attesa</h1>
                   <p className="text-gray-600 mb-6">
-                      Il tuo account è stato creato ed è in attesa di approvazione da parte dell'amministratore.
+                      Il tuo account è stato creato ed è in attesa di approvazione.
                   </p>
                   <div className="bg-indigo-50 p-4 rounded-lg text-xs text-left mb-6 text-indigo-800">
                       <strong>ID Utente:</strong> <span className="font-mono">{profile.id}</span><br/>
                       <strong>Stato:</strong> In attesa di verifica manuale.
-                      <p className="mt-2 text-slate-500 italic">Se sei l'amministratore, vai su Supabase &gt; Table Editor &gt; profiles e imposta <code>is_approved = TRUE</code> e <code>role = admin</code> per questo utente.</p>
                   </div>
-                  <button onClick={handleLogout} className="w-full bg-slate-900 text-white py-2 rounded-lg font-bold hover:bg-slate-800">
+                  <button onClick={handleLogout} className="w-full bg-slate-900 text-white py-2 rounded-lg font-bold hover:bg-slate-800 mb-4">
                       Torna al Login
                   </button>
+                  
+                  {/* SETUP LINK FOR STUCK USERS */}
+                  <button onClick={() => setShowDbSetup(true)} className="text-xs text-slate-400 hover:text-indigo-500 underline">
+                      Sei l'amministratore e sei bloccato qui? Clicca qui.
+                  </button>
               </div>
+              {renderDbSetupOverlay()}
           </div>
       );
   }
@@ -320,7 +332,12 @@ function App() {
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
-      <Sidebar currentView={view} onChangeView={setView} userProfile={profile} />
+      <Sidebar 
+        currentView={view} 
+        onChangeView={setView} 
+        userProfile={profile} 
+        onOpenSetup={() => setShowDbSetup(true)}
+      />
       
       <main className="flex-1 overflow-y-auto relative scroll-smooth bg-gray-50/50">
           {/* Header Mobile / User Info */}
@@ -348,6 +365,9 @@ function App() {
         initialEntry={editingEntry}
         projects={projects}
       />
+      
+      {/* Database Setup Overlay (Global) */}
+      {renderDbSetupOverlay()}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Database, Copy, Check, RefreshCw, Terminal, Shield, Key } from 'lucide-react';
+import { Database, Copy, Check, RefreshCw, Terminal, Shield, Key, AlertTriangle } from 'lucide-react';
 
-const INIT_SCRIPT = `-- 1. Crea la tabella PROFILES
+const INIT_SCRIPT = `-- 1. Crea la tabella PROFILES (se non esiste)
 create table if not exists public.profiles (
   id uuid references auth.users on delete cascade not null primary key,
   email text,
@@ -15,17 +15,39 @@ create table if not exists public.profiles (
 -- 2. Abilita sicurezza (RLS)
 alter table public.profiles enable row level security;
 
--- 3. Crea policy
-create policy "Users can insert their own profile" on public.profiles
-  for insert with check (auth.uid() = id);
+-- 3. PULIZIA POLICY VECCHIE (Per evitare conflitti)
+drop policy if exists "Users can insert their own profile" on public.profiles;
+drop policy if exists "Users can update own profile" on public.profiles;
+drop policy if exists "Public profiles are viewable by everyone" on public.profiles;
+drop policy if exists "Admins can update everyone" on public.profiles;
+drop policy if exists "Admins can delete everyone" on public.profiles;
 
-create policy "Users can update own profile" on public.profiles
-  for update using (auth.uid() = id);
-
+-- 4. CREA NUOVE POLICY
+-- Tutti possono vedere i profili (necessario per login e admin panel)
 create policy "Public profiles are viewable by everyone" on public.profiles
   for select using (true);
 
--- 4. Tabelle Progetti e Orari
+-- Gli utenti possono inserire se stessi al signup
+create policy "Users can insert their own profile" on public.profiles
+  for insert with check (auth.uid() = id);
+
+-- Gli utenti possono modificare SOLO se stessi
+create policy "Users can update own profile" on public.profiles
+  for update using (auth.uid() = id);
+
+-- GLI ADMIN POSSONO MODIFICARE TUTTI (Cruciale per il Pannello Admin)
+create policy "Admins can update everyone" on public.profiles
+  for update using (
+    (select role from public.profiles where id = auth.uid()) = 'admin'
+  );
+
+-- GLI ADMIN POSSONO ELIMINARE TUTTI
+create policy "Admins can delete everyone" on public.profiles
+  for delete using (
+    (select role from public.profiles where id = auth.uid()) = 'admin'
+  );
+
+-- 5. Tabelle Progetti e Orari
 create table if not exists public.projects (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references public.profiles(id) on delete cascade not null,
@@ -36,6 +58,7 @@ create table if not exists public.projects (
   created_at timestamptz default now()
 );
 alter table public.projects enable row level security;
+drop policy if exists "Users can CRUD their own projects" on public.projects;
 create policy "Users can CRUD their own projects" on public.projects
   for all using (auth.uid() = user_id);
 
@@ -53,10 +76,11 @@ create table if not exists public.time_entries (
   created_at timestamptz default now()
 );
 alter table public.time_entries enable row level security;
+drop policy if exists "Users can CRUD their own entries" on public.time_entries;
 create policy "Users can CRUD their own entries" on public.time_entries
   for all using (auth.uid() = user_id);
 
--- 5. Constraints per Dropdown Supabase
+-- 6. Constraints per Dropdown Supabase
 alter table public.profiles drop constraint if exists check_subscription_status;
 alter table public.profiles add constraint check_subscription_status 
   check (subscription_status in ('trial', 'active', 'pro', 'elite', 'expired'));
@@ -89,7 +113,7 @@ WHERE email = '${targetEmail}';`;
     };
 
     return (
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans">
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans z-50 relative">
             <div className="bg-white max-w-3xl w-full rounded-2xl shadow-2xl overflow-hidden flex flex-col">
                 <div className="bg-indigo-600 p-6 text-white flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -97,8 +121,8 @@ WHERE email = '${targetEmail}';`;
                             <Database size={32} />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold">Assistente Database</h1>
-                            <p className="opacity-90">Configura Supabase o ottieni permessi Admin.</p>
+                            <h1 className="text-2xl font-bold">Configurazione Database</h1>
+                            <p className="opacity-90">Inizializza tabelle e permessi.</p>
                         </div>
                     </div>
                 </div>
@@ -109,13 +133,13 @@ WHERE email = '${targetEmail}';`;
                         onClick={() => setActiveTab('init')}
                         className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${activeTab === 'init' ? 'border-b-4 border-indigo-600 text-indigo-700 bg-indigo-50' : 'text-gray-500 hover:bg-gray-50'}`}
                     >
-                        <Terminal size={18} /> Inizializzazione Tabelle
+                        <Terminal size={18} /> 1. Tabelle & Permessi
                     </button>
                     <button 
                         onClick={() => setActiveTab('admin')}
                         className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${activeTab === 'admin' ? 'border-b-4 border-indigo-600 text-indigo-700 bg-indigo-50' : 'text-gray-500 hover:bg-gray-50'}`}
                     >
-                        <Shield size={18} /> Diventa Admin (Fix)
+                        <Shield size={18} /> 2. Sblocca Admin
                     </button>
                 </div>
 
@@ -123,9 +147,12 @@ WHERE email = '${targetEmail}';`;
                     
                     {activeTab === 'init' && (
                         <>
-                            <p className="text-gray-600">
-                                Usa questo script se è la <strong>prima volta</strong> che avvii l'app o se vedi errori di caricamento. Crea le tabelle necessarie.
-                            </p>
+                            <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex gap-3">
+                                <AlertTriangle className="text-blue-600 shrink-0" />
+                                <div className="text-sm text-blue-800">
+                                    <strong>Importante:</strong> Esegui questo script per aggiornare le "Policy" di sicurezza. Senza questo, il pannello Admin non funzionerà perché Supabase bloccherà le modifiche agli altri utenti.
+                                </div>
+                            </div>
                             <div className="relative">
                                 <div className="absolute top-3 right-3">
                                     <button 
@@ -146,14 +173,14 @@ WHERE email = '${targetEmail}';`;
                         <div className="animate-fade-in">
                             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
                                 <h3 className="font-bold text-amber-800 mb-2 flex items-center gap-2">
-                                    <Key size={18} /> Problema Permessi?
+                                    <Key size={18} /> Come diventare Admin
                                 </h3>
                                 <p className="text-amber-700 text-sm">
-                                    Se non riesci ad accedere al Pannello Admin perché sei un utente "Trial", inserisci la tua email qui sotto. Genereremo un comando SQL per forzare il tuo ruolo ad <strong>Admin</strong> e lo stato a <strong>Elite</strong>.
+                                    Inserisci la tua email. Copia il codice SQL generato. Incollalo nell'Editor SQL di Supabase e premi RUN. Questo ti renderà immediatamente Admin ed Elite.
                                 </p>
                             </div>
 
-                            <label className="block text-sm font-bold text-gray-700 mb-2">La tua Email di Login:</label>
+                            <label className="block text-sm font-bold text-gray-700 mb-2">La tua Email:</label>
                             <input 
                                 type="email" 
                                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none mb-6 font-mono"
@@ -179,13 +206,12 @@ WHERE email = '${targetEmail}';`;
                     )}
 
                     <div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-600">
-                        <p className="font-bold mb-1">Come eseguire:</p>
+                        <p className="font-bold mb-1">Passaggi su Supabase:</p>
                         <ol className="list-decimal list-inside space-y-1">
-                            <li>Copia il codice SQL qui sopra.</li>
                             <li>Vai su <a href="https://supabase.com/dashboard" target="_blank" className="text-indigo-600 font-bold hover:underline">Supabase Dashboard</a> &gt; Progetto.</li>
                             <li>Clicca su <strong>SQL Editor</strong> (icona terminale a sinistra).</li>
-                            <li>Incolla e clicca <strong>Run</strong>.</li>
-                            <li>Torna qui e ricarica la pagina.</li>
+                            <li>Incolla il codice copiato qui sopra.</li>
+                            <li>Clicca su <strong>Run</strong> (in basso a destra).</li>
                         </ol>
                     </div>
 
