@@ -15,7 +15,7 @@ create table if not exists public.profiles (
 -- 2. Abilita sicurezza (RLS)
 alter table public.profiles enable row level security;
 
--- 3. Crea policy per permettere agli utenti di inserire il proprio profilo
+-- 3. Crea policy
 create policy "Users can insert their own profile" on public.profiles
   for insert with check (auth.uid() = id);
 
@@ -55,6 +55,15 @@ create table if not exists public.time_entries (
 alter table public.time_entries enable row level security;
 create policy "Users can CRUD their own entries" on public.time_entries
   for all using (auth.uid() = user_id);
+
+-- 5. Aggiungi Vincoli per Dropdown su Supabase (Opzionale ma consigliato)
+alter table public.profiles drop constraint if exists check_subscription_status;
+alter table public.profiles add constraint check_subscription_status 
+  check (subscription_status in ('trial', 'active', 'pro', 'elite', 'expired'));
+
+alter table public.profiles drop constraint if exists check_role;
+alter table public.profiles add constraint check_role 
+  check (role in ('admin', 'user'));
 `;
 
 const DatabaseSetup = () => {
