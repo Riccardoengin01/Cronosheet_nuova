@@ -1,3 +1,4 @@
+
 export interface Shift {
   id: string;
   name: string;
@@ -44,7 +45,8 @@ export interface UserProfile {
   email: string;
   full_name?: string;
   role: 'admin' | 'user';
-  subscription_status: 'trial' | 'active' | 'pro' | 'expired';
+  // Aggiunto 'elite' ai possibili stati
+  subscription_status: 'trial' | 'active' | 'pro' | 'elite' | 'expired';
   trial_ends_at: string;
   is_approved: boolean;
   password?: string; // Solo per Mock Mode locale

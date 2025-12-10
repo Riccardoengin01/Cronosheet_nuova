@@ -11,7 +11,7 @@ import Auth from './components/Auth';
 import DatabaseSetup from './components/DatabaseSetup';
 import * as DB from './services/db';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
-import { Plus, Lock, LogOut, Loader2, Database, Github, AlertTriangle } from 'lucide-react';
+import { Plus, Lock, LogOut, Loader2, Database, Github, Crown, Star } from 'lucide-react';
 
 function App() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -188,6 +188,24 @@ function App() {
       }
   };
 
+  const getPlanLabel = () => {
+      if (!profile) return null;
+      if (profile.subscription_status === 'elite') {
+          return <span className="flex items-center gap-1 text-amber-600 font-bold uppercase"><Crown size={14} fill="currentColor" /> Elite Member</span>;
+      }
+      if (profile.subscription_status === 'pro') {
+          return <span className="flex items-center gap-1 text-indigo-600 font-bold uppercase"><Star size={14} fill="currentColor" /> Pro Plan</span>;
+      }
+      if (profile.subscription_status === 'trial') {
+          return (
+            <span className="text-gray-500 font-medium">
+                TRIAL <span className="text-xs text-gray-400">({new Date(profile.trial_ends_at).toLocaleDateString()})</span>
+            </span>
+          );
+      }
+      return <span className="text-red-500 font-bold uppercase">Scaduto</span>;
+  };
+
   // --- RENDER LOGIC ---
 
   if (loadingAuth) {
@@ -239,10 +257,9 @@ function App() {
              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-800">Registro Servizi</h1>
-                    <p className="text-gray-500 mt-1">
-                        Piano: <span className="uppercase font-bold text-indigo-600">{profile?.subscription_status}</span> 
-                        {profile?.subscription_status === 'trial' && ` (Scade: ${new Date(profile.trial_ends_at).toLocaleDateString()})`}
-                    </p>
+                    <div className="mt-1">
+                        {getPlanLabel()}
+                    </div>
                 </div>
                 <button 
                     onClick={handleManualEntryClick}
@@ -288,7 +305,7 @@ function App() {
           <div className="absolute top-4 right-4 z-50 flex items-center gap-4">
                <div className="text-right hidden md:block">
                    <p className="text-sm font-bold text-gray-800">{profile.email}</p>
-                   <p className="text-xs text-indigo-600 capitalize">
+                   <p className="text-xs text-indigo-600 capitalize flex justify-end gap-1">
                        {profile.role} • {profile.subscription_status}
                    </p>
                </div>

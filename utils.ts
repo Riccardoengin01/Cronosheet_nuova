@@ -1,6 +1,17 @@
 import { TimeEntry, DayGroup } from './types';
 
-export const generateId = (): string => Math.random().toString(36).substring(2, 9);
+// Supabase richiede UUID validi per le colonne di tipo uuid.
+// Le vecchie stringhe brevi (Math.random) causavano il fallimento del salvataggio nel DB.
+export const generateId = (): string => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback per browser vecchi
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
 
 export const formatDuration = (seconds: number): string => {
   const h = Math.floor(seconds / 3600);
