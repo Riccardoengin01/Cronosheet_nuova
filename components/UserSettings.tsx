@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { UserProfile } from '../types';
-import { User, Mail, Shield, CheckCircle, Crown, Star, Clock, Zap, CreditCard, ToggleLeft, ToggleRight, ArrowRight } from 'lucide-react';
+import { User, Mail, Shield, CheckCircle, Crown, Star, Clock, Zap, CreditCard, ArrowRight } from 'lucide-react';
 
 interface UserSettingsProps {
     user: UserProfile;
@@ -9,9 +9,10 @@ interface UserSettingsProps {
 const UserSettings: React.FC<UserSettingsProps> = ({ user }) => {
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
 
-    // Fix data 1970
+    // Fix data 1970: Se la data è nulla/errata, calcoliamo visivamente 60 giorni da oggi
     const getTrialEndDate = () => {
         const d = new Date(user.trial_ends_at);
+        // Se timestamp è troppo basso (es. anno 1970), è un errore del DB, usiamo fallback
         if (d.getTime() < 100000000000) {
             const fixDate = new Date();
             fixDate.setDate(fixDate.getDate() + 60);
@@ -22,21 +23,26 @@ const UserSettings: React.FC<UserSettingsProps> = ({ user }) => {
 
     const trialEnd = getTrialEndDate();
     const now = new Date();
-    const totalTrialDays = 60;
+    // Calcolo giorni rimanenti reali
     const daysLeft = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 3600 * 24));
+    
+    // Barra progresso basata su 60 giorni totali
+    const totalTrialDays = 60;
     const progress = Math.max(0, Math.min(100, ((totalTrialDays - daysLeft) / totalTrialDays) * 100));
 
     const handleUpgrade = (planName: string) => {
         alert(`Procedura di upgrade al piano ${planName} (${billingCycle === 'annual' ? 'Annuale' : 'Mensile'}) avviata.\nQui si aprirà il gateway di pagamento (Stripe/PayPal).`);
     };
 
+    // Definiamo i piani disponibili per l'acquisto (Elite rimosso, solo per Admin)
     const plans = [
         {
             id: 'trial',
             name: 'Start',
             price: 'Gratis',
             annualPrice: 'Gratis',
-            features: ['Registro Orari (Max 50/mese)', 'Export PDF Base', 'Supporto Email Standard'],
+            // Regola: Max 15 voci (non copre un mese lavorativo intero)
+            features: ['Registro Orari (Max 15 voci)', 'Export PDF Base', 'Durata Limite: 60 giorni'],
             current: user.subscription_status === 'trial',
             color: 'bg-slate-100 border-slate-200',
             buttonColor: 'bg-slate-200 text-slate-600',
@@ -48,23 +54,12 @@ const UserSettings: React.FC<UserSettingsProps> = ({ user }) => {
             price: '€9.99',
             annualPrice: '€99.00',
             saveLabel: '-17%',
-            features: ['Voci Illimitate', 'Statistiche Avanzate', 'AI Assistant (Gemini)', 'Priorità Supporto 24h'],
+            // Regola: Tolto Gemini e Supporto, tenuto Statistiche e Voci Illimitate
+            features: ['Voci Illimitate', 'Statistiche Avanzate', 'Export Completo', 'Nessun Limite di Tempo'],
             current: user.subscription_status === 'pro',
             color: 'bg-white border-indigo-200 shadow-xl shadow-indigo-100 ring-1 ring-indigo-50',
             buttonColor: 'bg-indigo-600 text-white hover:bg-indigo-700',
             icon: <Star className="text-indigo-500 fill-indigo-500" />
-        },
-        {
-            id: 'elite',
-            name: 'Elite',
-            price: '€29.99',
-            annualPrice: '€299.00',
-            saveLabel: '-2 mesi',
-            features: ['Tutto Pro', 'Multi-Team & Collaboratori', 'API Access', 'Account Manager Dedicato'],
-            current: user.subscription_status === 'elite',
-            color: 'bg-amber-50 border-amber-200',
-            buttonColor: 'bg-amber-500 text-white hover:bg-amber-600',
-            icon: <Crown className="text-amber-500 fill-amber-500" />
         }
     ];
 
@@ -90,7 +85,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ user }) => {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 
-                {/* Colonna Sinistra: Info Utente (3/12) */}
+                {/* Colonna Sinistra: Info Utente (4/12) */}
                 <div className="lg:col-span-4 space-y-6">
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col items-center text-center relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-full h-20 bg-gradient-to-b from-indigo-50 to-transparent"></div>
@@ -134,7 +129,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ user }) => {
                     </div>
                 </div>
 
-                {/* Colonna Destra: Piani e Pagamenti (9/12) */}
+                {/* Colonna Destra: Piani e Pagamenti (8/12) */}
                 <div className="lg:col-span-8 space-y-8">
                     
                     {/* Status Card & Billing Switch */}
@@ -155,7 +150,9 @@ const UserSettings: React.FC<UserSettingsProps> = ({ user }) => {
                                 <p className="text-slate-400 mt-2 text-sm max-w-sm">
                                     {user.subscription_status === 'trial' 
                                         ? `Hai ancora ${daysLeft} giorni di prova gratuita.` 
-                                        : 'Il tuo abbonamento è attivo e si rinnoverà automaticamente.'}
+                                        : user.subscription_status === 'elite' 
+                                            ? 'Licenza Founder / Elite attiva.' 
+                                            : 'Il tuo abbonamento è attivo e si rinnoverà automaticamente.'}
                                 </p>
                             </div>
 
@@ -180,7 +177,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ user }) => {
                         {user.subscription_status === 'trial' && (
                              <div className="mt-8">
                                 <div className="flex justify-between text-xs font-semibold mb-2 text-slate-400">
-                                    <span>Inizio Prova</span>
+                                    <span>Inizio Prova (60gg)</span>
                                     <span>Scadenza: {trialEnd.toLocaleDateString()}</span>
                                 </div>
                                 <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden">
@@ -190,8 +187,8 @@ const UserSettings: React.FC<UserSettingsProps> = ({ user }) => {
                         )}
                     </div>
 
-                    {/* Pricing Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Pricing Grid - Solo 2 colonne ora (Start e Pro) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {plans.map(plan => {
                             const currentPrice = billingCycle === 'annual' ? plan.annualPrice : plan.price;
                             const isCurrent = plan.current;
