@@ -1,6 +1,6 @@
 import React from 'react';
 import { AppView, UserProfile } from '../types';
-import { Table2, PieChart, ShieldCheck, Users, Receipt, Shield, Github, Crown, Star, Clock, ChevronRight } from 'lucide-react';
+import { Table2, PieChart, ShieldCheck, Users, Receipt, Shield, Github, Crown, Star, Clock, ChevronRight, UserCog } from 'lucide-react';
 
 interface SidebarProps {
   currentView: AppView;
@@ -14,18 +14,26 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userProfil
     { id: AppView.CLIENTS, label: 'Clienti', icon: Users },
     { id: AppView.BILLING, label: 'Riepilogo', icon: Receipt },
     { id: AppView.REPORTS, label: 'Statistiche', icon: PieChart },
+    { id: AppView.SETTINGS, label: 'Il mio Profilo', icon: UserCog }, // Nuova voce per tutti
   ];
 
   if (userProfile?.role === 'admin') {
       menuItems.push({ id: AppView.ADMIN_PANEL, label: 'Admin Panel', icon: Shield });
   }
 
-  // Helper per calcolare giorni rimanenti
+  // Helper per calcolare giorni rimanenti con fix per data 1970 (null/zero)
   const getDaysLeft = () => {
       if (!userProfile) return 0;
-      const end = new Date(userProfile.trial_ends_at).getTime();
+      
+      let endDate = new Date(userProfile.trial_ends_at).getTime();
+      
+      // FIX: Se la data è nel 1970 (errore DB), simuliamo 60 giorni dalla creazione (o oggi)
+      if (endDate < 100000000000) { 
+          endDate = Date.now() + (60 * 24 * 60 * 60 * 1000); 
+      }
+
       const now = Date.now();
-      return Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+      return Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
   };
 
   const daysLeft = getDaysLeft();
@@ -49,8 +57,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userProfil
                       <Star size={14} fill="currentColor" />
                       <span className="text-xs font-bold uppercase tracking-wider">Pro Plan</span>
                   </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">
-                      Rinnovo tra {daysLeft} gg
+                  <div className="text-[10px] text-slate-400 mt-0.5">
+                      Scadenza tra {daysLeft} gg
                   </div>
               </div>
           );
@@ -64,7 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userProfil
                   <Clock size={14} />
                   <span className="text-xs font-bold uppercase tracking-wider">Trial</span>
               </div>
-              <div className={`text-[10px] mt-0.5 ${isExpired ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
+              <div className={`text-[10px] mt-0.5 ${isExpired ? 'text-red-500 font-bold' : 'text-slate-400'}`}>
                   {isExpired ? 'Scaduto' : `${daysLeft} giorni rimanenti`}
               </div>
           </div>
@@ -76,14 +84,14 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userProfil
       {/* Background Accent */}
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
       
-      {/* Header */}
+      {/* Header - Identico per tutti */}
       <div className="h-20 flex items-center justify-center lg:justify-start lg:px-6 border-b border-slate-800/50 bg-slate-900/50 backdrop-blur-sm">
-        <div className="bg-indigo-500/10 p-2 rounded-lg">
+        <div className="bg-indigo-500/10 p-2 rounded-lg shrink-0">
             <ShieldCheck className="w-8 h-8 text-indigo-400" />
         </div>
-        <div className="hidden lg:block ml-3">
-            <span className="font-bold text-xl tracking-tight block leading-none">Cronosheet</span>
-            <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">SaaS Platform</span>
+        <div className="hidden lg:block ml-3 overflow-hidden">
+            <span className="font-bold text-xl tracking-tight block leading-none truncate">Cronosheet</span>
+            <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold block">SaaS Platform</span>
         </div>
       </div>
 
@@ -113,18 +121,18 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userProfil
         })}
       </nav>
 
-      {/* User Info Card (Bottom) */}
+      {/* User Info Card (Bottom) - Visibile a tutti su Desktop */}
       <div className="p-4 border-t border-slate-800/50 bg-slate-900/50 space-y-3">
         
         {/* User Card */}
         <div className="bg-slate-800/40 rounded-xl p-4 hidden lg:block border border-slate-700/30 hover:border-slate-600 transition-colors group cursor-default">
             {/* User Profile Header */}
             <div className="flex items-center gap-3 mb-3">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-inner ${userProfile?.role === 'admin' ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white' : 'bg-slate-700 text-slate-300'}`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-inner border border-slate-600 ${userProfile?.role === 'admin' ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white' : 'bg-slate-700 text-slate-300'}`}>
                     {userProfile?.email.charAt(0).toUpperCase()}
                 </div>
                 <div className="overflow-hidden">
-                    <p className="text-sm font-bold text-white truncate" title={userProfile?.email}>
+                    <p className="text-sm font-bold text-white truncate w-32" title={userProfile?.email}>
                         {userProfile?.email.split('@')[0]}
                     </p>
                     <div className="flex items-center gap-1.5">
@@ -148,7 +156,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userProfil
         
         {/* Footer Links */}
         <div className="flex justify-center lg:justify-between items-center px-1">
-            <p className="hidden lg:block text-[10px] text-slate-600">v2.3.0</p>
+            <p className="hidden lg:block text-[10px] text-slate-600">v2.4.1</p>
             <a 
                 href="https://github.com/Riccardoengin01/Cronosheet" 
                 target="_blank" 

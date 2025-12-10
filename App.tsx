@@ -7,6 +7,7 @@ import EntryModal from './components/EntryModal';
 import ManageClients from './components/ManageClients';
 import Billing from './components/Billing';
 import AdminPanel from './components/AdminPanel';
+import UserSettings from './components/UserSettings';
 import Auth from './components/Auth';
 import * as DB from './services/db';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
@@ -284,6 +285,8 @@ function App() {
       case AppView.ADMIN_PANEL:
           if (profile.role !== 'admin') return <div className="text-red-500 p-8">Accesso Negato. Richiede permessi Admin.</div>;
           return <AdminPanel />;
+      case AppView.SETTINGS:
+          return <UserSettings user={profile} />;
       default:
         return null;
     }

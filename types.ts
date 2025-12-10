@@ -57,5 +57,6 @@ export enum AppView {
   REPORTS = 'REPORTS',
   CLIENTS = 'CLIENTS', 
   BILLING = 'BILLING',
-  ADMIN_PANEL = 'ADMIN_PANEL' // Vista dedicata all'Admin
+  ADMIN_PANEL = 'ADMIN_PANEL', // Vista dedicata all'Admin
+  SETTINGS = 'SETTINGS' // Vista profilo utente
 }
