@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { UserProfile } from '../types';
 import * as DB from '../services/db';
-import { Check, Shield, Trash2, AlertTriangle, RefreshCw, Crown, Star, Clock, UserCog, User } from 'lucide-react';
+import { Check, Shield, Trash2, RefreshCw, Crown, Star, Clock, UserCog, User, Search, TrendingUp, Users, AlertCircle } from 'lucide-react';
 
 const AdminPanel = () => {
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [loading, setLoading] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
         loadUsers();
@@ -27,9 +28,11 @@ const AdminPanel = () => {
         }
     };
 
-    const handleChangePlan = async (user: UserProfile, newStatus: 'trial' | 'pro' | 'elite') => {
+    const handleChangePlan = async (userId: string, newStatus: string) => {
+        // Cast string to specific union type safely
+        const status = newStatus as 'trial' | 'pro' | 'elite' | 'active' | 'expired';
         try {
-            await DB.updateUserProfileAdmin({ id: user.id, subscription_status: newStatus });
+            await DB.updateUserProfileAdmin({ id: userId, subscription_status: status });
             loadUsers();
         } catch (e) {
             alert("Errore modifica piano");
@@ -60,143 +63,199 @@ const AdminPanel = () => {
         }
     };
 
-    const getStatusBadge = (status: string) => {
-        switch(status) {
-            case 'elite':
-                return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-bold border border-amber-200"><Crown size={12} /> ELITE</span>;
-            case 'pro':
-                return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200"><Star size={12} /> PRO</span>;
-            case 'trial':
-                return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-bold border border-blue-100"><Clock size={12} /> TRIAL</span>;
-            default:
-                return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 text-gray-500 text-xs font-bold uppercase">{status}</span>;
-        }
+    // Statistiche
+    const stats = {
+        total: users.length,
+        admins: users.filter(u => u.role === 'admin').length,
+        pro: users.filter(u => u.subscription_status === 'pro').length,
+        elite: users.filter(u => u.subscription_status === 'elite').length,
+        pending: users.filter(u => !u.is_approved).length
     };
 
+    // Filtro
+    const filteredUsers = users.filter(u => 
+        u.email.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        u.id.includes(searchTerm)
+    );
+
     return (
-        <div className="space-y-6 animate-fade-in">
-            <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg flex justify-between items-center">
-                <div>
-                    <h2 className="text-2xl font-bold flex items-center gap-2">
-                        <Shield className="text-emerald-400" /> Pannello Amministrazione
-                    </h2>
-                    <p className="text-slate-400">Gestisci gli accessi e i livelli degli utenti.</p>
+        <div className="space-y-8 animate-fade-in pb-10">
+            {/* Header e Statistiche */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg md:col-span-4 flex justify-between items-center">
+                    <div>
+                        <h2 className="text-2xl font-bold flex items-center gap-2">
+                            <Shield className="text-emerald-400" /> Pannello Master
+                        </h2>
+                        <p className="text-slate-400">Gestione centralizzata utenti e licenze.</p>
+                    </div>
+                    <button onClick={loadUsers} className="p-2 bg-slate-800 rounded-lg hover:bg-slate-700 transition-colors">
+                        <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+                    </button>
                 </div>
-                <button onClick={loadUsers} className="p-2 bg-slate-800 rounded-lg hover:bg-slate-700 transition-colors">
-                    <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-                </button>
+
+                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
+                    <div className="bg-blue-100 p-3 rounded-lg text-blue-600"><Users size={24} /></div>
+                    <div>
+                        <p className="text-xs text-gray-500 font-bold uppercase">Totale Utenti</p>
+                        <p className="text-2xl font-bold text-gray-800">{stats.total}</p>
+                    </div>
+                </div>
+                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
+                    <div className="bg-indigo-100 p-3 rounded-lg text-indigo-600"><Star size={24} /></div>
+                    <div>
+                        <p className="text-xs text-gray-500 font-bold uppercase">Pro / Elite</p>
+                        <p className="text-2xl font-bold text-gray-800">{stats.pro + stats.elite}</p>
+                    </div>
+                </div>
+                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
+                    <div className="bg-emerald-100 p-3 rounded-lg text-emerald-600"><Shield size={24} /></div>
+                    <div>
+                        <p className="text-xs text-gray-500 font-bold uppercase">Admin</p>
+                        <p className="text-2xl font-bold text-gray-800">{stats.admins}</p>
+                    </div>
+                </div>
+                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
+                    <div className={`p-3 rounded-lg ${stats.pending > 0 ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400'}`}>
+                        <AlertCircle size={24} />
+                    </div>
+                    <div>
+                        <p className="text-xs text-gray-500 font-bold uppercase">In Attesa</p>
+                        <p className="text-2xl font-bold text-gray-800">{stats.pending}</p>
+                    </div>
+                </div>
             </div>
 
+            {/* Lista Utenti */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-50 text-gray-500 uppercase text-xs font-bold">
-                        <tr>
-                            <th className="px-6 py-4 border-b border-gray-100">Utente</th>
-                            <th className="px-6 py-4 border-b border-gray-100">Ruolo</th>
-                            <th className="px-6 py-4 border-b border-gray-100">Piano</th>
-                            <th className="px-6 py-4 text-right border-b border-gray-100">Gestione</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {users.length === 0 && !loading && (
-                            <tr><td colSpan={4} className="p-8 text-center text-gray-400">Nessun utente trovato</td></tr>
-                        )}
-                        {users.map(u => (
-                            <tr key={u.id} className="hover:bg-gray-50 transition-colors">
-                                {/* Colonna Utente */}
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${u.role === 'admin' ? 'bg-indigo-600' : 'bg-slate-400'}`}>
-                                            {u.email.charAt(0).toUpperCase()}
-                                        </div>
-                                        <div>
-                                            <div className="font-bold text-gray-800">{u.email || 'Nessuna Email'}</div>
-                                            <div className="text-xs text-gray-400 font-mono">
-                                                ID: {u.id.slice(0, 8)}...
+                {/* Toolbar */}
+                <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-4">
+                    <div className="relative flex-grow max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                        <input 
+                            type="text" 
+                            placeholder="Cerca per email o ID..." 
+                            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead className="bg-gray-50 text-gray-500 uppercase text-xs font-bold">
+                            <tr>
+                                <th className="px-6 py-4 border-b border-gray-200 w-1/3">Utente</th>
+                                <th className="px-6 py-4 border-b border-gray-200">Stato</th>
+                                <th className="px-6 py-4 border-b border-gray-200">Ruolo</th>
+                                <th className="px-6 py-4 border-b border-gray-200">Licenza</th>
+                                <th className="px-6 py-4 text-right border-b border-gray-200">Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {filteredUsers.length === 0 && !loading && (
+                                <tr><td colSpan={5} className="p-8 text-center text-gray-400">Nessun utente trovato</td></tr>
+                            )}
+                            {filteredUsers.map(u => (
+                                <tr key={u.id} className="hover:bg-gray-50 transition-colors group">
+                                    {/* Utente */}
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm ${u.role === 'admin' ? 'bg-indigo-600' : 'bg-slate-400'}`}>
+                                                {u.email.charAt(0).toUpperCase()}
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-gray-800 flex items-center gap-2">
+                                                    {u.email}
+                                                    {u.role === 'admin' && <Crown size={14} className="text-amber-500 fill-amber-500" />}
+                                                </div>
+                                                <div className="text-xs text-gray-400 font-mono" title={u.id}>
+                                                    {u.id}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                </td>
+                                    </td>
 
-                                {/* Colonna Ruolo */}
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center gap-2">
-                                        {u.role === 'admin' ? (
-                                            <span className="inline-flex items-center gap-1 text-purple-700 bg-purple-50 px-2 py-1 rounded text-xs font-bold border border-purple-100">
-                                                <Shield size={12} /> ADMIN
+                                    {/* Approvazione */}
+                                    <td className="px-6 py-4">
+                                        {u.is_approved ? (
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                                                Attivo
                                             </span>
                                         ) : (
-                                            <span className="inline-flex items-center gap-1 text-slate-600 bg-slate-100 px-2 py-1 rounded text-xs font-bold">
-                                                <User size={12} /> USER
-                                            </span>
-                                        )}
-                                        
-                                        <button 
-                                            onClick={() => handleToggleRole(u)}
-                                            className="ml-2 text-gray-300 hover:text-indigo-600 p-1 hover:bg-indigo-50 rounded transition-colors"
-                                            title={u.role === 'admin' ? "Rimuovi Admin" : "Promuovi ad Admin"}
-                                        >
-                                            <UserCog size={16} />
-                                        </button>
-                                    </div>
-                                </td>
-
-                                {/* Colonna Piano */}
-                                <td className="px-6 py-4">
-                                    <div className="flex flex-col gap-2 items-start">
-                                        {getStatusBadge(u.subscription_status)}
-                                        <div className="flex bg-gray-100 rounded-lg p-0.5 mt-1">
-                                            <button 
-                                                onClick={() => handleChangePlan(u, 'trial')}
-                                                className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${u.subscription_status === 'trial' ? 'bg-white shadow text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
-                                            >
-                                                Trial
-                                            </button>
-                                            <button 
-                                                onClick={() => handleChangePlan(u, 'pro')}
-                                                className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${u.subscription_status === 'pro' ? 'bg-white shadow text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
-                                            >
-                                                Pro
-                                            </button>
-                                            <button 
-                                                onClick={() => handleChangePlan(u, 'elite')}
-                                                className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${u.subscription_status === 'elite' ? 'bg-white shadow text-amber-600' : 'text-gray-400 hover:text-gray-600'}`}
-                                            >
-                                                Elite
-                                            </button>
-                                        </div>
-                                    </div>
-                                </td>
-
-                                {/* Colonna Azioni */}
-                                <td className="px-6 py-4 text-right">
-                                    <div className="flex justify-end items-center gap-2">
-                                        {!u.is_approved ? (
                                             <button 
                                                 onClick={() => handleApprove(u)}
-                                                className="bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-600 shadow-sm flex items-center gap-1"
+                                                className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-bold hover:bg-amber-200 transition-colors border border-amber-200 shadow-sm"
                                             >
-                                                <Check size={14} /> APPROVA
+                                                <AlertCircle size={12} /> Approva Ora
                                             </button>
-                                        ) : (
-                                            <span className="text-emerald-600 text-xs font-bold flex items-center gap-1 justify-end opacity-50 cursor-default">
-                                                <Check size={14} /> Attivo
-                                            </span>
                                         )}
-                                        
+                                    </td>
+
+                                    {/* Ruolo */}
+                                    <td className="px-6 py-4">
+                                        <button 
+                                            onClick={() => handleToggleRole(u)}
+                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                                                u.role === 'admin' 
+                                                ? 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100' 
+                                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                                            }`}
+                                        >
+                                            {u.role === 'admin' ? <Shield size={14} /> : <User size={14} />}
+                                            {u.role.toUpperCase()}
+                                        </button>
+                                    </td>
+
+                                    {/* Licenza (Dropdown Simulato con pulsanti per chiarezza) */}
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-2">
+                                            <select 
+                                                value={u.subscription_status}
+                                                onChange={(e) => handleChangePlan(u.id, e.target.value)}
+                                                className={`appearance-none pl-8 pr-8 py-1.5 rounded-lg text-xs font-bold border outline-none cursor-pointer transition-colors uppercase tracking-wide
+                                                    ${u.subscription_status === 'elite' ? 'bg-amber-50 border-amber-200 text-amber-700' : 
+                                                      u.subscription_status === 'pro' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 
+                                                      'bg-blue-50 border-blue-200 text-blue-700'}
+                                                `}
+                                                style={{ 
+                                                    backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="gray" viewBox="0 0 16 16"><path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/></svg>')`,
+                                                    backgroundRepeat: 'no-repeat',
+                                                    backgroundPosition: 'right 8px center'
+                                                }}
+                                            >
+                                                <option value="trial">Trial</option>
+                                                <option value="pro">Pro</option>
+                                                <option value="elite">Elite</option>
+                                                <option value="expired">Scaduto</option>
+                                            </select>
+                                            
+                                            {/* Icona indicativa a sinistra della select */}
+                                            <div className="absolute ml-2 pointer-events-none">
+                                                {u.subscription_status === 'elite' && <Crown size={12} className="text-amber-600" />}
+                                                {u.subscription_status === 'pro' && <Star size={12} className="text-indigo-600" />}
+                                                {u.subscription_status === 'trial' && <Clock size={12} className="text-blue-600" />}
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    {/* Azioni */}
+                                    <td className="px-6 py-4 text-right">
                                         <button 
                                             onClick={() => handleDelete(u.id)}
                                             className="text-gray-300 hover:text-red-500 p-2 hover:bg-red-50 rounded-lg transition-colors"
-                                            title="Elimina Utente"
+                                            title="Elimina Utente per sempre"
                                         >
-                                            <Trash2 size={16} />
+                                            <Trash2 size={18} />
                                         </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );

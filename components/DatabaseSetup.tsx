@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Database, Copy, Check, RefreshCw, Terminal } from 'lucide-react';
+import { Database, Copy, Check, RefreshCw, Terminal, Shield, Key } from 'lucide-react';
 
-const SQL_SCRIPT = `-- 1. Crea la tabella PROFILES
+const INIT_SCRIPT = `-- 1. Crea la tabella PROFILES
 create table if not exists public.profiles (
   id uuid references auth.users on delete cascade not null primary key,
   email text,
@@ -56,7 +56,7 @@ alter table public.time_entries enable row level security;
 create policy "Users can CRUD their own entries" on public.time_entries
   for all using (auth.uid() = user_id);
 
--- 5. Aggiungi Vincoli per Dropdown su Supabase (Opzionale ma consigliato)
+-- 5. Constraints per Dropdown Supabase
 alter table public.profiles drop constraint if exists check_subscription_status;
 alter table public.profiles add constraint check_subscription_status 
   check (subscription_status in ('trial', 'active', 'pro', 'elite', 'expired'));
@@ -67,10 +67,23 @@ alter table public.profiles add constraint check_role
 `;
 
 const DatabaseSetup = () => {
+    const [activeTab, setActiveTab] = useState<'init' | 'admin'>('init');
     const [copied, setCopied] = useState(false);
+    const [email, setEmail] = useState('');
 
-    const handleCopy = () => {
-        navigator.clipboard.writeText(SQL_SCRIPT);
+    const getAdminScript = () => {
+        const targetEmail = email.trim() || 'tua@email.com';
+        return `-- Renditi Admin, Approvato ed Elite
+UPDATE public.profiles
+SET 
+    role = 'admin',
+    is_approved = true,
+    subscription_status = 'elite'
+WHERE email = '${targetEmail}';`;
+    };
+
+    const handleCopy = (text: string) => {
+        navigator.clipboard.writeText(text);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
@@ -78,54 +91,110 @@ const DatabaseSetup = () => {
     return (
         <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans">
             <div className="bg-white max-w-3xl w-full rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-                <div className="bg-amber-500 p-6 text-white flex items-center gap-4">
-                    <div className="bg-white/20 p-3 rounded-lg">
-                        <Database size={32} />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl font-bold">Configurazione Database Mancante</h1>
-                        <p className="opacity-90">Le tabelle su Supabase non esistono o mancano i permessi.</p>
+                <div className="bg-indigo-600 p-6 text-white flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="bg-white/20 p-3 rounded-lg">
+                            <Database size={32} />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-bold">Assistente Database</h1>
+                            <p className="opacity-90">Configura Supabase o ottieni permessi Admin.</p>
+                        </div>
                     </div>
                 </div>
 
+                {/* Tabs */}
+                <div className="flex border-b border-gray-200">
+                    <button 
+                        onClick={() => setActiveTab('init')}
+                        className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${activeTab === 'init' ? 'border-b-4 border-indigo-600 text-indigo-700 bg-indigo-50' : 'text-gray-500 hover:bg-gray-50'}`}
+                    >
+                        <Terminal size={18} /> Inizializzazione Tabelle
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('admin')}
+                        className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${activeTab === 'admin' ? 'border-b-4 border-indigo-600 text-indigo-700 bg-indigo-50' : 'text-gray-500 hover:bg-gray-50'}`}
+                    >
+                        <Shield size={18} /> Diventa Admin (Fix)
+                    </button>
+                </div>
+
                 <div className="p-8 space-y-6">
-                    <p className="text-gray-600 text-lg">
-                        L'app è connessa, ma non riesce a salvare il tuo profilo. Questo succede quando non hai eseguito lo script di inizializzazione.
-                    </p>
+                    
+                    {activeTab === 'init' && (
+                        <>
+                            <p className="text-gray-600">
+                                Usa questo script se è la <strong>prima volta</strong> che avvii l'app o se vedi errori di caricamento. Crea le tabelle necessarie.
+                            </p>
+                            <div className="relative">
+                                <div className="absolute top-3 right-3">
+                                    <button 
+                                        onClick={() => handleCopy(INIT_SCRIPT)}
+                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${copied ? 'bg-green-500 text-white' : 'bg-slate-700 text-white hover:bg-slate-600'}`}
+                                    >
+                                        {copied ? <Check size={14}/> : <Copy size={14}/>} Copia
+                                    </button>
+                                </div>
+                                <pre className="bg-slate-900 text-slate-300 p-4 rounded-xl overflow-x-auto text-xs font-mono h-64 border-4 border-slate-100">
+                                    <code>{INIT_SCRIPT}</code>
+                                </pre>
+                            </div>
+                        </>
+                    )}
 
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                         <h3 className="font-bold text-slate-800 mb-2 flex items-center gap-2">
-                             <Terminal size={18} className="text-indigo-600"/> Come Risolvere:
-                         </h3>
-                         <ol className="list-decimal list-inside text-slate-700 space-y-1 ml-2">
-                             <li>Copia lo script qui sotto.</li>
-                             <li>Vai su <a href="https://supabase.com/dashboard" target="_blank" className="text-indigo-600 font-bold underline">Supabase Dashboard</a>.</li>
-                             <li>Apri la sezione <strong>SQL Editor</strong> (icona terminale a sinistra).</li>
-                             <li>Incolla il codice e clicca <strong>Run</strong> in basso a destra.</li>
-                         </ol>
-                    </div>
+                    {activeTab === 'admin' && (
+                        <div className="animate-fade-in">
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+                                <h3 className="font-bold text-amber-800 mb-2 flex items-center gap-2">
+                                    <Key size={18} /> Problema Permessi?
+                                </h3>
+                                <p className="text-amber-700 text-sm">
+                                    Se non riesci ad accedere al Pannello Admin perché sei un utente "Trial", inserisci la tua email qui sotto. Genereremo un comando SQL per forzare il tuo ruolo ad <strong>Admin</strong> e lo stato a <strong>Elite</strong>.
+                                </p>
+                            </div>
 
-                    <div className="relative">
-                        <div className="absolute top-3 right-3">
-                            <button 
-                                onClick={handleCopy}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${copied ? 'bg-green-500 text-white' : 'bg-slate-700 text-white hover:bg-slate-600'}`}
-                            >
-                                {copied ? <Check size={14}/> : <Copy size={14}/>}
-                                {copied ? 'Copiato!' : 'Copia SQL'}
-                            </button>
+                            <label className="block text-sm font-bold text-gray-700 mb-2">La tua Email di Login:</label>
+                            <input 
+                                type="email" 
+                                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none mb-6 font-mono"
+                                placeholder="tuo@indirizzo.com"
+                                value={email}
+                                onChange={e => setEmail(e.target.value)}
+                            />
+
+                            <div className="relative">
+                                <div className="absolute top-3 right-3">
+                                    <button 
+                                        onClick={() => handleCopy(getAdminScript())}
+                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${copied ? 'bg-green-500 text-white' : 'bg-slate-700 text-white hover:bg-slate-600'}`}
+                                    >
+                                        {copied ? <Check size={14}/> : <Copy size={14}/>} Copia SQL
+                                    </button>
+                                </div>
+                                <pre className="bg-slate-900 text-emerald-400 p-4 rounded-xl overflow-x-auto text-sm font-mono border-4 border-slate-100">
+                                    <code>{getAdminScript()}</code>
+                                </pre>
+                            </div>
                         </div>
-                        <pre className="bg-slate-900 text-slate-300 p-4 rounded-xl overflow-x-auto text-sm font-mono h-64 border-4 border-slate-100">
-                            <code>{SQL_SCRIPT}</code>
-                        </pre>
+                    )}
+
+                    <div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-600">
+                        <p className="font-bold mb-1">Come eseguire:</p>
+                        <ol className="list-decimal list-inside space-y-1">
+                            <li>Copia il codice SQL qui sopra.</li>
+                            <li>Vai su <a href="https://supabase.com/dashboard" target="_blank" className="text-indigo-600 font-bold hover:underline">Supabase Dashboard</a> &gt; Progetto.</li>
+                            <li>Clicca su <strong>SQL Editor</strong> (icona terminale a sinistra).</li>
+                            <li>Incolla e clicca <strong>Run</strong>.</li>
+                            <li>Torna qui e ricarica la pagina.</li>
+                        </ol>
                     </div>
 
-                    <div className="flex justify-center pt-4">
+                    <div className="flex justify-center pt-2">
                         <button 
                             onClick={() => window.location.reload()}
                             className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold transition-all flex items-center gap-2 shadow-lg shadow-indigo-200"
                         >
-                            <RefreshCw size={20} /> Ho eseguito lo script, Riprova
+                            <RefreshCw size={20} /> Ricarica App
                         </button>
                     </div>
                 </div>
