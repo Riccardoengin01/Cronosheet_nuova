@@ -1,18 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { UserProfile } from '../types';
-import { User, Mail, Shield, Calendar, CreditCard, CheckCircle, Crown, Star, Clock, Zap } from 'lucide-react';
+import { User, Mail, Shield, CheckCircle, Crown, Star, Clock, Zap, CreditCard, ToggleLeft, ToggleRight, ArrowRight } from 'lucide-react';
 
 interface UserSettingsProps {
     user: UserProfile;
 }
 
 const UserSettings: React.FC<UserSettingsProps> = ({ user }) => {
+    const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
 
     // Fix data 1970
     const getTrialEndDate = () => {
         const d = new Date(user.trial_ends_at);
         if (d.getTime() < 100000000000) {
-            // Se data invalida (1970), assumi 60 giorni da oggi per visualizzazione
             const fixDate = new Date();
             fixDate.setDate(fixDate.getDate() + 60);
             return fixDate;
@@ -26,52 +26,81 @@ const UserSettings: React.FC<UserSettingsProps> = ({ user }) => {
     const daysLeft = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 3600 * 24));
     const progress = Math.max(0, Math.min(100, ((totalTrialDays - daysLeft) / totalTrialDays) * 100));
 
+    const handleUpgrade = (planName: string) => {
+        alert(`Procedura di upgrade al piano ${planName} (${billingCycle === 'annual' ? 'Annuale' : 'Mensile'}) avviata.\nQui si aprirà il gateway di pagamento (Stripe/PayPal).`);
+    };
+
     const plans = [
         {
             id: 'trial',
             name: 'Start',
             price: 'Gratis',
-            features: ['Registro Orari', 'Export PDF', 'Supporto Base'],
+            annualPrice: 'Gratis',
+            features: ['Registro Orari (Max 50/mese)', 'Export PDF Base', 'Supporto Email Standard'],
             current: user.subscription_status === 'trial',
-            color: 'bg-blue-500'
+            color: 'bg-slate-100 border-slate-200',
+            buttonColor: 'bg-slate-200 text-slate-600',
+            icon: <Clock className="text-slate-500" />
         },
         {
             id: 'pro',
             name: 'Pro',
-            price: '€9.99/mese',
-            features: ['Tutto Start', 'Statistiche Avanzate', 'AI Assistant', 'Priorità Supporto'],
+            price: '€9.99',
+            annualPrice: '€99.00',
+            saveLabel: '-17%',
+            features: ['Voci Illimitate', 'Statistiche Avanzate', 'AI Assistant (Gemini)', 'Priorità Supporto 24h'],
             current: user.subscription_status === 'pro',
-            color: 'bg-indigo-600'
+            color: 'bg-white border-indigo-200 shadow-xl shadow-indigo-100 ring-1 ring-indigo-50',
+            buttonColor: 'bg-indigo-600 text-white hover:bg-indigo-700',
+            icon: <Star className="text-indigo-500 fill-indigo-500" />
         },
         {
             id: 'elite',
             name: 'Elite',
-            price: '€29.99/mese',
-            features: ['Tutto Pro', 'Multi-Team', 'API Access', 'Account Manager Dedicato'],
+            price: '€29.99',
+            annualPrice: '€299.00',
+            saveLabel: '-2 mesi',
+            features: ['Tutto Pro', 'Multi-Team & Collaboratori', 'API Access', 'Account Manager Dedicato'],
             current: user.subscription_status === 'elite',
-            color: 'bg-amber-500'
+            color: 'bg-amber-50 border-amber-200',
+            buttonColor: 'bg-amber-500 text-white hover:bg-amber-600',
+            icon: <Crown className="text-amber-500 fill-amber-500" />
         }
     ];
 
     return (
         <div className="animate-fade-in space-y-8 pb-12">
-            <div>
-                <h1 className="text-3xl font-bold text-gray-800">Il mio Profilo</h1>
-                <p className="text-gray-500 mt-1">Gestisci le tue informazioni e il piano di abbonamento.</p>
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-800">Il mio Profilo</h1>
+                    <p className="text-gray-500 mt-1">Gestisci le tue informazioni e il piano di abbonamento.</p>
+                </div>
+                
+                {/* User Header Summary for Mobile */}
+                <div className="md:hidden flex items-center gap-3 bg-white p-3 rounded-xl border border-gray-200">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white ${user.role === 'admin' ? 'bg-indigo-600' : 'bg-slate-700'}`}>
+                        {user.email.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                        <p className="text-sm font-bold text-gray-800 truncate max-w-[150px]">{user.email}</p>
+                        <span className="text-xs text-gray-500 capitalize">{user.role}</span>
+                    </div>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 
-                {/* Colonna Sinistra: Info Utente */}
-                <div className="lg:col-span-1 space-y-6">
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col items-center text-center">
-                        <div className={`w-24 h-24 rounded-full flex items-center justify-center text-4xl font-bold text-white mb-4 shadow-lg ${user.role === 'admin' ? 'bg-gradient-to-br from-indigo-500 to-purple-600' : 'bg-slate-700'}`}>
+                {/* Colonna Sinistra: Info Utente (3/12) */}
+                <div className="lg:col-span-4 space-y-6">
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col items-center text-center relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-20 bg-gradient-to-b from-indigo-50 to-transparent"></div>
+                        <div className={`relative z-10 w-24 h-24 rounded-full flex items-center justify-center text-4xl font-bold text-white mb-4 shadow-lg border-4 border-white ${user.role === 'admin' ? 'bg-gradient-to-br from-indigo-500 to-purple-600' : 'bg-slate-700'}`}>
                             {user.email.charAt(0).toUpperCase()}
                         </div>
-                        <h2 className="text-xl font-bold text-gray-800">{user.email.split('@')[0]}</h2>
-                        <span className="text-sm text-gray-500 mb-4">{user.email}</span>
+                        <h2 className="text-xl font-bold text-gray-800 break-all">{user.email.split('@')[0]}</h2>
+                        <span className="text-sm text-gray-500 mb-4 break-all">{user.email}</span>
                         
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap justify-center gap-2">
                              <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold uppercase border border-slate-200 flex items-center gap-1">
                                  <User size={12} /> {user.role}
                              </span>
@@ -85,7 +114,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ user }) => {
 
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
                         <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                            <Shield size={18} className="text-indigo-500"/> Dettagli Sicurezza
+                            <Shield size={18} className="text-indigo-500"/> Dettagli Account
                         </h3>
                         <div className="space-y-4 text-sm">
                             <div className="flex justify-between items-center py-2 border-b border-gray-50">
@@ -93,108 +122,131 @@ const UserSettings: React.FC<UserSettingsProps> = ({ user }) => {
                                 <span className="font-mono text-gray-700 text-xs bg-gray-100 px-2 py-1 rounded truncate max-w-[120px]" title={user.id}>{user.id}</span>
                             </div>
                             <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                                <span className="text-gray-500">Registrato il</span>
-                                <span className="text-gray-700 font-medium">11 Dic 2024</span>
+                                <span className="text-gray-500">Membro dal</span>
+                                <span className="text-gray-700 font-medium">{new Date(user.trial_ends_at).toLocaleDateString()}</span> 
                             </div>
                             <div className="pt-2">
-                                <button className="text-indigo-600 hover:text-indigo-800 text-xs font-bold flex items-center gap-1">
-                                    <Mail size={12} /> Cambia Email
+                                <button className="text-indigo-600 hover:text-indigo-800 text-xs font-bold flex items-center gap-1 w-full justify-center py-2 border border-indigo-100 rounded-lg hover:bg-indigo-50 transition-colors">
+                                    <Mail size={12} /> Cambia Email / Password
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Colonna Destra: Stato Abbonamento */}
-                <div className="lg:col-span-2 space-y-6">
+                {/* Colonna Destra: Piani e Pagamenti (9/12) */}
+                <div className="lg:col-span-8 space-y-8">
                     
-                    {/* Status Card */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-8 opacity-5">
-                            {user.subscription_status === 'elite' ? <Crown size={120} /> : <Zap size={120} />}
+                    {/* Status Card & Billing Switch */}
+                    <div className="bg-slate-900 text-white rounded-2xl shadow-lg p-8 relative overflow-hidden">
+                        {/* Background pattern */}
+                        <div className="absolute top-0 right-0 p-8 opacity-10">
+                            {user.subscription_status === 'elite' ? <Crown size={150} /> : <Zap size={150} />}
                         </div>
                         
-                        <div className="relative z-10">
-                            <div className="flex justify-between items-start mb-6">
-                                <div>
-                                    <p className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-1">Piano Attivo</p>
-                                    <h2 className="text-3xl font-bold text-gray-800 capitalize flex items-center gap-3">
-                                        {user.subscription_status} Plan
-                                        {user.subscription_status === 'elite' && <Crown className="text-amber-500 fill-amber-500" size={24} />}
-                                        {user.subscription_status === 'pro' && <Star className="text-indigo-500 fill-indigo-500" size={24} />}
-                                    </h2>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-1">Stato</p>
-                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-bold">
-                                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                        Attivo
-                                    </span>
-                                </div>
+                        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                            <div>
+                                <p className="text-sm font-bold text-indigo-300 uppercase tracking-wider mb-1">Piano Attuale</p>
+                                <h2 className="text-4xl font-bold text-white capitalize flex items-center gap-3">
+                                    {user.subscription_status}
+                                    {user.subscription_status === 'elite' && <Crown className="text-amber-400 fill-amber-400" size={32} />}
+                                    {user.subscription_status === 'pro' && <Star className="text-indigo-400 fill-indigo-400" size={32} />}
+                                </h2>
+                                <p className="text-slate-400 mt-2 text-sm max-w-sm">
+                                    {user.subscription_status === 'trial' 
+                                        ? `Hai ancora ${daysLeft} giorni di prova gratuita.` 
+                                        : 'Il tuo abbonamento è attivo e si rinnoverà automaticamente.'}
+                                </p>
                             </div>
 
-                            {/* Trial Progress */}
-                            {user.subscription_status === 'trial' && (
-                                <div className="bg-slate-50 rounded-xl p-5 border border-slate-100 mb-6">
-                                    <div className="flex justify-between items-end mb-2">
-                                        <span className="text-sm font-medium text-slate-600 flex items-center gap-2">
-                                            <Clock size={16} /> Periodo di Prova
-                                        </span>
-                                        <span className="text-sm font-bold text-slate-800">{daysLeft} giorni rimanenti</span>
-                                    </div>
-                                    <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                                        <div 
-                                            className="bg-indigo-600 h-3 rounded-full transition-all duration-1000" 
-                                            style={{ width: `${progress}%` }}
-                                        ></div>
-                                    </div>
-                                    <p className="text-xs text-slate-400 mt-2 text-right">Scadenza: {trialEnd.toLocaleDateString()}</p>
-                                </div>
-                            )}
-
-                            <div className="flex gap-4">
-                                <button className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-shadow shadow-lg shadow-indigo-200">
-                                    Gestisci Pagamenti
+                            {/* Billing Cycle Switch */}
+                            <div className="bg-slate-800 p-1.5 rounded-xl inline-flex items-center border border-slate-700">
+                                <button
+                                    onClick={() => setBillingCycle('monthly')}
+                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${billingCycle === 'monthly' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    Mensile
                                 </button>
-                                <button className="bg-white text-gray-600 border border-gray-200 px-6 py-3 rounded-xl font-bold hover:bg-gray-50">
-                                    Scarica Fatture
+                                <button
+                                    onClick={() => setBillingCycle('annual')}
+                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1 ${billingCycle === 'annual' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    Annuale <span className="text-[10px] bg-green-500 text-white px-1.5 rounded-full ml-1">-17%</span>
                                 </button>
                             </div>
                         </div>
+
+                        {/* Progress Bar for Trial */}
+                        {user.subscription_status === 'trial' && (
+                             <div className="mt-8">
+                                <div className="flex justify-between text-xs font-semibold mb-2 text-slate-400">
+                                    <span>Inizio Prova</span>
+                                    <span>Scadenza: {trialEnd.toLocaleDateString()}</span>
+                                </div>
+                                <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden">
+                                    <div className="bg-gradient-to-r from-indigo-500 to-purple-500 h-2 rounded-full transition-all duration-1000" style={{ width: `${progress}%` }}></div>
+                                </div>
+                             </div>
+                        )}
                     </div>
 
-                    {/* Plans Grid */}
-                    <div>
-                        <h3 className="text-xl font-bold text-gray-800 mb-4">Piani Disponibili</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {plans.map(plan => (
-                                <div key={plan.id} className={`rounded-xl p-6 border-2 transition-all cursor-pointer hover:shadow-lg ${plan.current ? 'border-indigo-500 bg-indigo-50/50' : 'border-gray-100 bg-white hover:border-indigo-200'}`}>
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div>
-                                            <h4 className="font-bold text-lg text-gray-800">{plan.name}</h4>
-                                            <p className="text-gray-500 text-sm font-medium">{plan.price}</p>
+                    {/* Pricing Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {plans.map(plan => {
+                            const currentPrice = billingCycle === 'annual' ? plan.annualPrice : plan.price;
+                            const isCurrent = plan.current;
+                            
+                            return (
+                                <div key={plan.id} className={`rounded-2xl p-6 border-2 transition-all flex flex-col relative ${isCurrent ? 'border-indigo-500 ring-4 ring-indigo-50/50 z-10 transform md:-translate-y-2' : 'border-gray-200 bg-white hover:border-gray-300'} ${plan.color}`}>
+                                    
+                                    {plan.saveLabel && billingCycle === 'annual' && (
+                                        <div className="absolute top-0 right-0 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-bl-xl rounded-tr-lg">
+                                            Risparmia {plan.saveLabel}
                                         </div>
-                                        {plan.current && <CheckCircle className="text-indigo-600" size={20} />}
+                                    )}
+
+                                    <div className="mb-4">
+                                        <div className="w-12 h-12 rounded-xl bg-white border border-gray-100 flex items-center justify-center mb-4 shadow-sm">
+                                            {plan.icon}
+                                        </div>
+                                        <h4 className="font-bold text-xl text-gray-800">{plan.name}</h4>
+                                        <div className="flex items-baseline gap-1 mt-1">
+                                            <span className="text-2xl font-bold text-gray-900">{currentPrice}</span>
+                                            {plan.price !== 'Gratis' && <span className="text-gray-500 text-sm">/{billingCycle === 'annual' ? 'anno' : 'mese'}</span>}
+                                        </div>
                                     </div>
-                                    <ul className="space-y-2 mb-6">
+
+                                    <ul className="space-y-3 mb-8 flex-grow">
                                         {plan.features.map((feat, i) => (
-                                            <li key={i} className="text-xs text-gray-600 flex items-center gap-2">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-400"></div> {feat}
+                                            <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
+                                                <CheckCircle size={16} className={`shrink-0 mt-0.5 ${isCurrent ? 'text-indigo-600' : 'text-gray-400'}`} />
+                                                <span className="leading-tight">{feat}</span>
                                             </li>
                                         ))}
                                     </ul>
+
                                     <button 
-                                        className={`w-full py-2 rounded-lg text-sm font-bold transition-colors ${
-                                            plan.current 
-                                            ? 'bg-indigo-100 text-indigo-700 cursor-default' 
-                                            : 'bg-slate-800 text-white hover:bg-slate-900'
-                                        }`}
+                                        onClick={() => !isCurrent && handleUpgrade(plan.name)}
+                                        disabled={isCurrent}
+                                        className={`w-full py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${plan.buttonColor} ${isCurrent ? 'opacity-50 cursor-default' : 'shadow-lg shadow-indigo-100 hover:scale-[1.02]'}`}
                                     >
-                                        {plan.current ? 'Piano Attuale' : 'Passa a ' + plan.name}
+                                        {isCurrent ? (
+                                            <>Piano Attuale</>
+                                        ) : (
+                                            <>Passa a {plan.name} <ArrowRight size={16}/></>
+                                        )}
                                     </button>
                                 </div>
-                            ))}
+                            );
+                        })}
+                    </div>
+
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-600">
+                        <div className="flex items-center gap-3">
+                            <CreditCard className="text-gray-400" />
+                            <span>Pagamenti sicuri e crittografati tramite Stripe.</span>
                         </div>
+                        <a href="#" className="text-indigo-600 font-bold hover:underline">Scarica Fatture Precedenti</a>
                     </div>
 
                 </div>
