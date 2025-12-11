@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Project, TimeEntry } from '../types';
 import { groupEntriesByDay, formatTime, formatDurationHuman, formatDuration, formatCurrency, calculateEarnings } from '../utils';
-import { Trash2, MapPin, Clock, Pencil, Moon, Filter, X, CheckSquare, Square, Calendar, ChevronDown, Search } from 'lucide-react';
+import { Trash2, MapPin, Clock, Pencil, Moon, Filter, X, CheckSquare, Square, Calendar, ChevronDown, Search, ListFilter } from 'lucide-react';
 
 interface TimeLogTableProps {
   entries: TimeEntry[];
@@ -17,7 +17,6 @@ const TimeLogTable: React.FC<TimeLogTableProps> = ({ entries, projects, onDelete
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   
   // UI States
-  const [showFilters, setShowFilters] = useState(false);
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [clientSearchTerm, setClientSearchTerm] = useState('');
   const clientDropdownRef = useRef<HTMLDivElement>(null);
@@ -114,10 +113,7 @@ const TimeLogTable: React.FC<TimeLogTableProps> = ({ entries, projects, onDelete
           // 1. Filtro Progetto
           const matchesProject = selectedProjectIds.length > 0 ? selectedProjectIds.includes(entry.projectId) : false;
           
-          // 2. Filtro Mese (Se nessun mese è selezionato globalmente, mostra tutto dell'anno corrente? 
-          //    No, meglio mostrare tutto se selectedMonths è vuoto, OPPURE logica rigorosa.
-          //    Qui usiamo logica: Se selectedMonths ha valori, deve matchare. Se vuoto, non mostra niente o tutto?
-          //    UX Choice: Se l'utente non seleziona mesi, mostriamo tutto l'anno selezionato.
+          // 2. Filtro Mese
           let matchesMonth = false;
           if (selectedMonths.length > 0) {
               matchesMonth = selectedMonths.includes(entryMonth);
@@ -125,14 +121,6 @@ const TimeLogTable: React.FC<TimeLogTableProps> = ({ entries, projects, onDelete
               // Fallback: Se non ho filtri mese specifici, mostro tutto l'anno selezionato
               matchesMonth = entryDate.getFullYear().toString() === selectedYear;
           }
-
-          // Nota: il filtro selectedMonths contiene stringhe "YYYY-MM", quindi include già l'anno.
-          // Tuttavia, se ho selezionato "Nov 2023" e cambio la view all'anno "2024", 
-          // voglio vedere ancora le entry 2023 o no?
-          // Per coerenza con l'UI "Anno", forziamo che l'entry debba appartenere all'anno selezionato
-          // TRANNE se ho esplicitamente selezionato dei mesi.
-          // Semplificazione: Mostriamo solo ciò che corrisponde ai mesi selezionati. 
-          // Se la lista mesi è vuota, mostriamo tutto l'anno corrente selezionato nel tab.
 
           const matchesYear = entryDate.getFullYear().toString() === selectedYear;
 
@@ -152,7 +140,7 @@ const TimeLogTable: React.FC<TimeLogTableProps> = ({ entries, projects, onDelete
   const formatMonthLabel = (m: string) => {
       const [y, mo] = m.split('-');
       const date = new Date(parseInt(y), parseInt(mo) - 1, 1);
-      return date.toLocaleDateString('it-IT', { month: 'short' });
+      return date.toLocaleDateString('it-IT', { month: 'long' }); // Nome esteso per maggiore visibilità
   };
 
   if (entries.length === 0) {
@@ -168,127 +156,131 @@ const TimeLogTable: React.FC<TimeLogTableProps> = ({ entries, projects, onDelete
   return (
     <div className="space-y-6 animate-fade-in">
       
-      {/* --- COMPACT FILTER BAR --- */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center p-2 gap-2">
-          
-          {/* 1. Year Selector (Tabs) */}
-          <div className="flex items-center bg-gray-100 p-1 rounded-lg shrink-0 overflow-x-auto">
-              {availableYears.map(year => (
-                  <button
-                      key={year}
-                      onClick={() => setSelectedYear(year)}
-                      className={`px-3 py-1.5 text-sm font-bold rounded-md transition-all ${
-                          selectedYear === year 
-                          ? 'bg-white text-indigo-600 shadow-sm' 
-                          : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                  >
-                      {year}
-                  </button>
-              ))}
-          </div>
-
-          <div className="w-px h-8 bg-gray-200 hidden md:block mx-2"></div>
-
-          {/* 2. Clienti Dropdown (Space Saver) */}
-          <div className="relative" ref={clientDropdownRef}>
-              <button 
-                  onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-all w-full md:w-auto justify-between ${
-                      selectedProjectIds.length > 0 && selectedProjectIds.length < projects.length
-                      ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
-                      : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
-                  }`}
-              >
-                  <div className="flex items-center gap-2">
-                      <MapPin size={16} />
-                      <span>
-                          {selectedProjectIds.length === projects.length 
-                            ? 'Tutti i Clienti' 
-                            : `${selectedProjectIds.length} Clienti scelti`}
-                      </span>
-                  </div>
-                  <ChevronDown size={14} className={`transition-transform ${isClientDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {isClientDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-100 z-50 p-3 animate-slide-down">
-                      {/* Search */}
-                      <div className="relative mb-3">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-                          <input 
-                              type="text" 
-                              placeholder="Cerca cliente..." 
-                              className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500"
-                              value={clientSearchTerm}
-                              onChange={e => setClientSearchTerm(e.target.value)}
-                              autoFocus
-                          />
-                      </div>
-                      
-                      {/* Actions */}
-                      <div className="flex justify-between items-center mb-2 px-1">
-                          <span className="text-xs font-bold text-gray-400 uppercase">Seleziona</span>
-                          <button onClick={toggleAllProjects} className="text-xs text-indigo-600 font-bold hover:underline">
-                              {selectedProjectIds.length === projects.length ? 'Deseleziona' : 'Tutti'}
-                          </button>
-                      </div>
-
-                      {/* List */}
-                      <div className="max-h-48 overflow-y-auto space-y-1 custom-scrollbar">
-                          {filteredProjectsList.map(p => {
-                              const isSelected = selectedProjectIds.includes(p.id);
-                              return (
-                                  <button
-                                      key={p.id}
-                                      onClick={() => toggleProject(p.id)}
-                                      className={`flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm transition-colors text-left ${
-                                          isSelected ? 'bg-indigo-50 text-indigo-800' : 'hover:bg-gray-50 text-gray-600'
-                                      }`}
-                                  >
-                                      {isSelected ? <CheckSquare size={14} className="shrink-0"/> : <Square size={14} className="shrink-0 text-gray-300"/>}
-                                      <span className="truncate">{p.name}</span>
-                                  </button>
-                              )
-                          })}
-                          {filteredProjectsList.length === 0 && <p className="text-center text-xs text-gray-400 py-2">Nessun risultato</p>}
-                      </div>
-                  </div>
-              )}
-          </div>
-
-          <div className="w-px h-8 bg-gray-200 hidden md:block mx-2"></div>
-
-          {/* 3. Mesi Horizontal Scroll (Space Saver) */}
-          <div className="flex-grow flex items-center gap-2 overflow-hidden">
-             <div className="flex items-center gap-2 overflow-x-auto py-1 px-1 custom-scrollbar w-full">
-                  <button 
-                      onClick={toggleAllMonthsInYear}
-                      className="shrink-0 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
-                  >
-                      Tutto {selectedYear}
-                  </button>
-                  {availableMonthsInYear.length === 0 && (
-                      <span className="text-xs text-gray-400 italic px-2">Nessun dato nel {selectedYear}</span>
-                  )}
-                  {availableMonthsInYear.map(m => {
-                      const isSelected = selectedMonths.includes(m);
-                      return (
-                          <button
-                              key={m}
-                              onClick={() => toggleMonth(m)}
-                              className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm border transition-all capitalize whitespace-nowrap ${
-                                  isSelected 
-                                  ? 'bg-amber-50 border-amber-200 text-amber-800 font-medium' 
-                                  : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
-                              }`}
+      {/* --- REDESIGNED FILTER PANEL --- */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <div className="flex flex-col gap-6">
+              
+              {/* Row 1: Macro Filters (Year & Client) */}
+              <div className="flex flex-col md:flex-row gap-6 md:items-end border-b border-gray-100 pb-6">
+                  
+                  {/* Year Selector - Big & Visible */}
+                  <div className="w-full md:w-48">
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-2 flex items-center gap-1">
+                          <Calendar size={14} /> Anno di Riferimento
+                      </label>
+                      <div className="relative">
+                          <select
+                              value={selectedYear}
+                              onChange={(e) => setSelectedYear(e.target.value)}
+                              className="w-full appearance-none bg-indigo-50 hover:bg-indigo-100 text-indigo-900 font-bold text-lg py-3 pl-4 pr-10 rounded-xl cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-transparent focus:border-indigo-500"
                           >
-                              {isSelected && <CheckSquare size={12} />}
-                              {formatMonthLabel(m)}
-                          </button>
-                      )
-                  })}
-             </div>
+                              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-500 pointer-events-none" size={20} />
+                      </div>
+                  </div>
+
+                  {/* Client Selector Dropdown */}
+                  <div className="w-full md:flex-grow relative" ref={clientDropdownRef}>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-2 flex items-center gap-1">
+                          <MapPin size={14} /> Filtra Cliente
+                      </label>
+                      <button 
+                          onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
+                          className={`flex items-center justify-between w-full px-4 py-3 rounded-xl text-base font-medium border transition-all ${
+                              selectedProjectIds.length > 0 && selectedProjectIds.length < projects.length
+                              ? 'bg-white border-indigo-300 text-indigo-700 shadow-sm ring-1 ring-indigo-100'
+                              : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                      >
+                          <div className="flex items-center gap-2 truncate">
+                              <span>
+                                  {selectedProjectIds.length === projects.length 
+                                    ? 'Tutti i Clienti' 
+                                    : `${selectedProjectIds.length} Clienti selezionati`}
+                              </span>
+                          </div>
+                          <ChevronDown size={18} className={`transition-transform text-gray-400 ${isClientDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {isClientDropdownOpen && (
+                          <div className="absolute top-full left-0 mt-2 w-full md:w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-50 p-3 animate-slide-down">
+                              <div className="relative mb-3">
+                                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                                  <input 
+                                      type="text" 
+                                      placeholder="Cerca cliente..." 
+                                      className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500"
+                                      value={clientSearchTerm}
+                                      onChange={e => setClientSearchTerm(e.target.value)}
+                                      autoFocus
+                                  />
+                              </div>
+                              <div className="flex justify-between items-center mb-2 px-1">
+                                  <span className="text-xs font-bold text-gray-400 uppercase">Seleziona</span>
+                                  <button onClick={toggleAllProjects} className="text-xs text-indigo-600 font-bold hover:underline">
+                                      {selectedProjectIds.length === projects.length ? 'Deseleziona' : 'Tutti'}
+                                  </button>
+                              </div>
+                              <div className="max-h-48 overflow-y-auto space-y-1 custom-scrollbar">
+                                  {filteredProjectsList.map(p => {
+                                      const isSelected = selectedProjectIds.includes(p.id);
+                                      return (
+                                          <button
+                                              key={p.id}
+                                              onClick={() => toggleProject(p.id)}
+                                              className={`flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm transition-colors text-left ${
+                                                  isSelected ? 'bg-indigo-50 text-indigo-800' : 'hover:bg-gray-50 text-gray-600'
+                                              }`}
+                                          >
+                                              {isSelected ? <CheckSquare size={16} className="shrink-0 text-indigo-600"/> : <Square size={16} className="shrink-0 text-gray-300"/>}
+                                              <span className="truncate">{p.name}</span>
+                                          </button>
+                                      )
+                                  })}
+                              </div>
+                          </div>
+                      )}
+                  </div>
+              </div>
+
+              {/* Row 2: Month Multi-Selector (Expanded) */}
+              <div>
+                 <div className="flex justify-between items-center mb-3">
+                     <label className="text-xs font-bold text-gray-400 uppercase flex items-center gap-1">
+                         <ListFilter size={14} /> Mesi Disponibili
+                     </label>
+                     <button 
+                        onClick={toggleAllMonthsInYear} 
+                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-2 py-1 rounded transition-colors"
+                     >
+                         {availableMonthsInYear.every(m => selectedMonths.includes(m)) ? 'Deseleziona Tutti' : 'Seleziona Tutti'}
+                     </button>
+                 </div>
+                 
+                 <div className="flex flex-wrap gap-2">
+                      {availableMonthsInYear.length === 0 && (
+                          <span className="text-sm text-gray-400 italic py-2">Nessun dato registrato nel {selectedYear}</span>
+                      )}
+                      {availableMonthsInYear.map(m => {
+                          const isSelected = selectedMonths.includes(m);
+                          return (
+                              <button
+                                  key={m}
+                                  onClick={() => toggleMonth(m)}
+                                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm border transition-all capitalize shadow-sm ${
+                                      isSelected 
+                                      ? 'bg-amber-50 border-amber-300 text-amber-900 font-bold ring-1 ring-amber-100' 
+                                      : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                                  }`}
+                              >
+                                  {isSelected ? <CheckSquare size={16} className="text-amber-600" /> : <Square size={16} className="text-gray-300" />}
+                                  {formatMonthLabel(m)}
+                              </button>
+                          )
+                      })}
+                 </div>
+              </div>
           </div>
       </div>
       
