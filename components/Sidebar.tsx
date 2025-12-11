@@ -154,18 +154,25 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, userProfil
              </div>
         </div>
         
-        {/* Footer Links */}
-        <div className="flex justify-center lg:justify-between items-center px-1">
-            <p className="hidden lg:block text-[10px] text-slate-600">v2.4.1</p>
-            <a 
-                href="https://github.com/Riccardoengin01/Cronosheet" 
-                target="_blank" 
-                rel="noreferrer"
-                className="text-slate-600 hover:text-white transition-colors"
-                title="GitHub Repo"
-            >
-                <Github size={16} />
-            </a>
+        {/* Footer Links & Copyright */}
+        <div className="flex flex-col gap-2">
+            <div className="flex justify-center lg:justify-between items-center px-1">
+                <p className="hidden lg:block text-[10px] text-slate-600">v2.5.0</p>
+                <a 
+                    href="https://github.com/Riccardoengin01/Cronosheet" 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="text-slate-600 hover:text-white transition-colors"
+                    title="GitHub Repo"
+                >
+                    <Github size={16} />
+                </a>
+            </div>
+            <div className="hidden lg:block text-center border-t border-slate-800 pt-2 mt-1">
+                <p className="text-[10px] text-slate-500 font-medium tracking-wide">
+                    © Engineer Riccardo Righini
+                </p>
+            </div>
         </div>
       </div>
     </aside>

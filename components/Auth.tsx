@@ -145,6 +145,9 @@ const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
                         <FileText size={12} /> Privacy & Policy Dati
                     </button>
                 </div>
+                <div className="mt-4 pt-4 border-t border-gray-100 text-[10px] text-gray-400 font-medium">
+                     © {new Date().getFullYear()} Engineer Riccardo Righini
+                </div>
             </div>
         </div>
       </div>

@@ -403,7 +403,7 @@ const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
 
           {/* Footer Note */}
           <div className="mt-12 text-center text-xs text-gray-400 print:fixed print:bottom-4 print:left-0 print:w-full">
-              Generato con Cronosheet - {new Date().toLocaleDateString()}
+              Generato con Cronosheet • © {new Date().getFullYear()} Engineer Riccardo Righini
           </div>
       </div>
     </div>
