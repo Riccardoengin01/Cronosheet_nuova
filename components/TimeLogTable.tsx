@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Project, TimeEntry } from '../types';
 import { groupEntriesByDay, formatTime, formatDurationHuman, formatDuration, formatCurrency, calculateEarnings } from '../utils';
-import { Trash2, MapPin, Clock, Pencil, DollarSign, Moon, Filter, X } from 'lucide-react';
+import { Trash2, MapPin, Clock, Pencil, Moon, Filter, X, CheckSquare, Square, Calendar } from 'lucide-react';
 
 interface TimeLogTableProps {
   entries: TimeEntry[];
@@ -11,23 +11,74 @@ interface TimeLogTableProps {
 }
 
 const TimeLogTable: React.FC<TimeLogTableProps> = ({ entries, projects, onDelete, onEdit }) => {
-  // State for filters
-  const [filterProjectId, setFilterProjectId] = useState<string>('');
-  const [filterMonth, setFilterMonth] = useState<string>(''); // Format "YYYY-MM"
+  // Stati per Filtri Multipli
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
+
+  // 1. Calcola i mesi disponibili dai dati esistenti (YYYY-MM)
+  const availableMonths = useMemo(() => {
+      const months = new Set(entries.map(e => new Date(e.startTime).toISOString().slice(0, 7)));
+      return Array.from(months).sort().reverse();
+  }, [entries]);
+
+  // Inizializzazione: Seleziona tutto di default al primo caricamento
+  useEffect(() => {
+      if (projects.length > 0 && selectedProjectIds.length === 0) {
+          setSelectedProjectIds(projects.map(p => p.id));
+      }
+      if (availableMonths.length > 0 && selectedMonths.length === 0) {
+          // Default: Mese corrente o il più recente
+          const currentMonth = new Date().toISOString().slice(0, 7);
+          if (availableMonths.includes(currentMonth)) {
+             setSelectedMonths([currentMonth]);
+          } else {
+             setSelectedMonths(availableMonths.slice(0, 1));
+          }
+      }
+  }, [projects, availableMonths]); // Runna solo se cambiano le dipendenze base
+
+  // Toggle Helpers
+  const toggleProject = (id: string) => {
+      setSelectedProjectIds(prev => 
+          prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+      );
+  };
+  const toggleAllProjects = () => {
+      setSelectedProjectIds(selectedProjectIds.length === projects.length ? [] : projects.map(p => p.id));
+  };
+
+  const toggleMonth = (month: string) => {
+      setSelectedMonths(prev => 
+          prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month]
+      );
+  };
+  const toggleAllMonths = () => {
+      setSelectedMonths(selectedMonths.length === availableMonths.length ? [] : availableMonths);
+  };
 
   // Filter Logic
-  const filteredEntries = entries.filter(entry => {
-      const entryDate = new Date(entry.startTime);
-      const entryMonthStr = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, '0')}`;
-      
-      const matchesProject = filterProjectId ? entry.projectId === filterProjectId : true;
-      const matchesMonth = filterMonth ? entryMonthStr === filterMonth : true;
+  const filteredEntries = useMemo(() => {
+      return entries.filter(entry => {
+          const entryMonth = new Date(entry.startTime).toISOString().slice(0, 7);
+          
+          const matchesProject = selectedProjectIds.length > 0 ? selectedProjectIds.includes(entry.projectId) : false;
+          const matchesMonth = selectedMonths.length > 0 ? selectedMonths.includes(entryMonth) : false;
 
-      return matchesProject && matchesMonth;
-  });
+          return matchesProject && matchesMonth;
+      });
+  }, [entries, selectedProjectIds, selectedMonths]);
 
   const grouped = groupEntriesByDay(filteredEntries);
   const totalFilteredEarnings = filteredEntries.reduce((acc, e) => acc + calculateEarnings(e), 0);
+  const totalDuration = filteredEntries.reduce((acc, e) => acc + (e.duration || 0), 0);
+
+  // Formatta Mese per UI (es. "2024-01" -> "Gennaio 2024")
+  const formatMonthLabel = (m: string) => {
+      const [y, mo] = m.split('-');
+      const date = new Date(parseInt(y), parseInt(mo) - 1, 1);
+      return date.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+  };
 
   if (entries.length === 0) {
       return (
@@ -43,47 +94,111 @@ const TimeLogTable: React.FC<TimeLogTableProps> = ({ entries, projects, onDelete
     <div className="space-y-6 animate-fade-in">
       
       {/* Filters Bar */}
-      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="flex items-center gap-2 text-gray-500 font-medium">
-              <Filter size={18} />
-              <span>Filtra Registro:</span>
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div 
+            className="p-4 flex items-center justify-between cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+              <div className="flex items-center gap-2 font-medium text-gray-700">
+                  <Filter size={18} className="text-indigo-600" />
+                  <span>Filtri Avanzati</span>
+                  <span className="text-xs font-normal text-gray-500 bg-white px-2 py-0.5 rounded border border-gray-200 ml-2">
+                      {selectedProjectIds.length} clienti, {selectedMonths.length} mesi
+                  </span>
+              </div>
+              <div className="text-xs text-indigo-600 font-bold uppercase">
+                  {showFilters ? 'Nascondi' : 'Espandi'}
+              </div>
           </div>
-          <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
-              <select 
-                  className="px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 outline-none focus:ring-2 focus:ring-indigo-500"
-                  value={filterProjectId}
-                  onChange={e => setFilterProjectId(e.target.value)}
-              >
-                  <option value="">Tutti i Clienti</option>
-                  {projects.map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-              </select>
-              
-              <input 
-                  type="month"
-                  className="px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 outline-none focus:ring-2 focus:ring-indigo-500"
-                  value={filterMonth}
-                  onChange={e => setFilterMonth(e.target.value)}
-              />
 
-              {(filterProjectId || filterMonth) && (
-                  <button 
-                    onClick={() => { setFilterProjectId(''); setFilterMonth(''); }}
-                    className="text-gray-400 hover:text-red-500 transition-colors p-2"
-                    title="Rimuovi Filtri"
-                  >
-                      <X size={20} />
-                  </button>
-              )}
-          </div>
+          {showFilters && (
+              <div className="p-4 border-t border-gray-200 space-y-6 animate-slide-down">
+                  
+                  {/* Filtro Clienti */}
+                  <div>
+                      <div className="flex justify-between items-center mb-2">
+                          <label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                              <MapPin size={12}/> Clienti
+                          </label>
+                          <button onClick={toggleAllProjects} className="text-xs text-indigo-600 hover:underline">
+                              {selectedProjectIds.length === projects.length ? 'Deseleziona tutti' : 'Seleziona tutti'}
+                          </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                          {projects.map(p => {
+                              const isSelected = selectedProjectIds.includes(p.id);
+                              return (
+                                  <button
+                                      key={p.id}
+                                      onClick={() => toggleProject(p.id)}
+                                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border transition-all ${
+                                          isSelected 
+                                          ? 'bg-indigo-50 border-indigo-200 text-indigo-800 font-medium' 
+                                          : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                                      }`}
+                                  >
+                                      {isSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+                                      {p.name}
+                                  </button>
+                              )
+                          })}
+                      </div>
+                  </div>
+
+                  {/* Filtro Mesi */}
+                  <div>
+                      <div className="flex justify-between items-center mb-2">
+                          <label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                              <Calendar size={12}/> Mesi
+                          </label>
+                          <button onClick={toggleAllMonths} className="text-xs text-indigo-600 hover:underline">
+                              {selectedMonths.length === availableMonths.length ? 'Deseleziona tutti' : 'Seleziona tutti'}
+                          </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                          {availableMonths.map(m => {
+                              const isSelected = selectedMonths.includes(m);
+                              return (
+                                  <button
+                                      key={m}
+                                      onClick={() => toggleMonth(m)}
+                                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border transition-all capitalize ${
+                                          isSelected 
+                                          ? 'bg-amber-50 border-amber-200 text-amber-800 font-medium' 
+                                          : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                                      }`}
+                                  >
+                                      {isSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+                                      {formatMonthLabel(m)}
+                                  </button>
+                              )
+                          })}
+                          {availableMonths.length === 0 && <span className="text-sm text-gray-400 italic">Nessun dato temporale disponibile.</span>}
+                      </div>
+                  </div>
+              </div>
+          )}
       </div>
       
-      {/* Totals for Filtered View */}
-      {(filterProjectId || filterMonth) && filteredEntries.length > 0 && (
-          <div className="flex justify-between items-center bg-indigo-50 p-4 rounded-xl border border-indigo-100 text-indigo-900">
-              <span className="font-semibold">Totale Periodo Selezionato:</span>
-              <span className="font-bold text-xl">{formatCurrency(totalFilteredEarnings)}</span>
+      {/* Totals Bar */}
+      {filteredEntries.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-indigo-600 text-white p-4 rounded-xl shadow-md col-span-2 md:col-span-1">
+                  <span className="text-indigo-200 text-xs font-bold uppercase block mb-1">Guadagno Totale</span>
+                  <span className="font-bold text-2xl">{formatCurrency(totalFilteredEarnings)}</span>
+              </div>
+              <div className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm col-span-2 md:col-span-1">
+                  <span className="text-gray-400 text-xs font-bold uppercase block mb-1">Ore Totali</span>
+                  <span className="font-bold text-2xl text-gray-800">{formatDurationHuman(totalDuration)}</span>
+              </div>
+              <div className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm col-span-1">
+                  <span className="text-gray-400 text-xs font-bold uppercase block mb-1">Voci</span>
+                  <span className="font-bold text-2xl text-gray-800">{filteredEntries.length}</span>
+              </div>
+              <div className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm col-span-1">
+                  <span className="text-gray-400 text-xs font-bold uppercase block mb-1">Giorni Lavorati</span>
+                  <span className="font-bold text-2xl text-gray-800">{grouped.length}</span>
+              </div>
           </div>
       )}
 

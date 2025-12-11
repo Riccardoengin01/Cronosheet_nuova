@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Project, TimeEntry } from '../types';
 import { formatCurrency, formatDuration, calculateEarnings, formatTime } from '../utils';
-import { Printer, Calendar, FileText, CheckSquare, Square, Filter } from 'lucide-react';
+import { Printer, Calendar, CheckSquare, Square, MapPin } from 'lucide-react';
 
 interface BillingProps {
   entries: TimeEntry[];
@@ -11,18 +11,30 @@ interface BillingProps {
 const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
   // Supporto Multi-Selezione
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
-  
-  const [selectedMonth, setSelectedMonth] = useState<string>(
-    new Date().toISOString().slice(0, 7) // YYYY-MM
-  );
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
 
-  // Inizializza selezionando tutti i progetti quando vengono caricati
+  // Calcola i mesi disponibili dai dati (YYYY-MM)
+  const availableMonths = useMemo(() => {
+      const months = new Set(entries.map(e => new Date(e.startTime).toISOString().slice(0, 7)));
+      return Array.from(months).sort().reverse();
+  }, [entries]);
+
+  // Inizializza selezionando tutto o i dati più recenti
   useEffect(() => {
       if (projects.length > 0 && selectedProjectIds.length === 0) {
           setSelectedProjectIds(projects.map(p => p.id));
       }
-  }, [projects]);
+      if (availableMonths.length > 0 && selectedMonths.length === 0) {
+           const currentMonth = new Date().toISOString().slice(0, 7);
+           if (availableMonths.includes(currentMonth)) {
+               setSelectedMonths([currentMonth]);
+           } else {
+               setSelectedMonths(availableMonths.slice(0, 1));
+           }
+      }
+  }, [projects, availableMonths]);
 
+  // Handlers Toggle
   const toggleProject = (id: string) => {
       if (selectedProjectIds.includes(id)) {
           setSelectedProjectIds(selectedProjectIds.filter(pid => pid !== id));
@@ -30,24 +42,30 @@ const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
           setSelectedProjectIds([...selectedProjectIds, id]);
       }
   };
+  const toggleAllProjects = () => {
+      setSelectedProjectIds(selectedProjectIds.length === projects.length ? [] : projects.map(p => p.id));
+  };
 
-  const toggleAll = () => {
-      if (selectedProjectIds.length === projects.length) {
-          setSelectedProjectIds([]);
+  const toggleMonth = (month: string) => {
+      if (selectedMonths.includes(month)) {
+          setSelectedMonths(selectedMonths.filter(m => m !== month));
       } else {
-          setSelectedProjectIds(projects.map(p => p.id));
+          setSelectedMonths([...selectedMonths, month]);
       }
+  };
+  const toggleAllMonths = () => {
+      setSelectedMonths(selectedMonths.length === availableMonths.length ? [] : availableMonths);
   };
 
   const filteredEntries = useMemo(() => {
     return entries.filter(e => {
-        if (selectedProjectIds.length === 0 || !selectedMonth) return false;
+        if (selectedProjectIds.length === 0 || selectedMonths.length === 0) return false;
         
         const entryMonth = new Date(e.startTime).toISOString().slice(0, 7);
-        // Filtra se l'ID progetto è nell'array dei selezionati
-        return selectedProjectIds.includes(e.projectId) && entryMonth === selectedMonth;
+        // Filtra se l'ID progetto è nell'array dei selezionati E il mese è selezionato
+        return selectedProjectIds.includes(e.projectId) && selectedMonths.includes(entryMonth);
     }).sort((a, b) => a.startTime - b.startTime);
-  }, [entries, selectedProjectIds, selectedMonth]);
+  }, [entries, selectedProjectIds, selectedMonths]);
 
   const totalAmount = filteredEntries.reduce((acc, curr) => acc + calculateEarnings(curr), 0);
   const totalHours = filteredEntries.reduce((acc, curr) => acc + (curr.duration || 0), 0) / 3600;
@@ -55,6 +73,23 @@ const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
   const handlePrint = () => {
       window.print();
   };
+
+  const formatMonthLabel = (m: string) => {
+      const [y, mo] = m.split('-');
+      const date = new Date(parseInt(y), parseInt(mo) - 1, 1);
+      return date.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+  };
+
+  // Costruisci stringa periodo per il PDF
+  const periodString = useMemo(() => {
+      if (selectedMonths.length === 0) return '-';
+      if (selectedMonths.length === 1) return formatMonthLabel(selectedMonths[0]);
+      
+      // Se sono tanti, mostriamo range se consecutivi (semplificato: lista separata da virgola)
+      // Ordiniamo per data
+      const sorted = [...selectedMonths].sort();
+      return sorted.map(m => formatMonthLabel(m).replace(/ [0-9]{4}/, '')).join(', ') + ' ' + sorted[0].split('-')[0];
+  }, [selectedMonths]);
 
   if (projects.length === 0) {
       return (
@@ -68,65 +103,96 @@ const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
   const showProjectColumn = selectedProjectIds.length > 1;
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
+    <div className="space-y-6 animate-fade-in max-w-5xl mx-auto">
       
       {/* Controls - Hidden in print */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 print:hidden">
-        <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <Calendar className="text-indigo-600" />
-            Configura Riepilogo
-        </h2>
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 print:hidden grid grid-cols-1 lg:grid-cols-2 gap-8">
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Mese di Riferimento</label>
-                <input 
-                    type="month"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                    value={selectedMonth}
-                    onChange={e => setSelectedMonth(e.target.value)}
-                />
+        <div>
+            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <Calendar className="text-indigo-600" />
+                Configura Periodo e Clienti
+            </h2>
+            
+            {/* Selettore Mesi Multipli */}
+            <div className="mb-6">
+                <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-bold text-gray-500 uppercase tracking-wide">Mesi da includere</label>
+                    <button onClick={toggleAllMonths} className="text-xs text-indigo-600 font-bold hover:underline">
+                        {selectedMonths.length === availableMonths.length ? 'Deseleziona' : 'Seleziona Tutti'}
+                    </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    {availableMonths.map(m => {
+                        const isSelected = selectedMonths.includes(m);
+                        return (
+                            <button
+                                key={m}
+                                onClick={() => toggleMonth(m)}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border transition-all capitalize ${
+                                    isSelected 
+                                    ? 'bg-amber-50 border-amber-200 text-amber-800 font-medium' 
+                                    : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                                }`}
+                            >
+                                {isSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+                                {formatMonthLabel(m)}
+                            </button>
+                        )
+                    })}
+                     {availableMonths.length === 0 && <span className="text-sm text-gray-400 italic">Nessun mese disponibile.</span>}
+                </div>
             </div>
-             <div className="flex items-end">
-                <button 
-                    onClick={handlePrint}
-                    className="w-full flex items-center justify-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-900 transition-colors shadow-md"
-                >
-                    <Printer size={18} /> Stampa / PDF
-                </button>
+
+             {/* Selettore Progetti */}
+            <div>
+                <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-bold text-gray-500 uppercase tracking-wide">Clienti da includere</label>
+                    <button onClick={toggleAllProjects} className="text-xs text-indigo-600 font-bold hover:underline">
+                        {selectedProjectIds.length === projects.length ? 'Deseleziona' : 'Seleziona Tutti'}
+                    </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    {projects.map(p => {
+                        const isSelected = selectedProjectIds.includes(p.id);
+                        return (
+                            <button
+                                key={p.id}
+                                onClick={() => toggleProject(p.id)}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border transition-all ${
+                                    isSelected 
+                                    ? 'bg-indigo-50 border-indigo-200 text-indigo-800 font-medium' 
+                                    : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                                }`}
+                            >
+                                {isSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+                                {p.name}
+                            </button>
+                        )
+                    })}
+                </div>
             </div>
         </div>
 
-        <div>
-            <div className="flex justify-between items-center mb-2">
-                <label className="block text-sm font-medium text-gray-700">Seleziona Clienti da includere:</label>
-                <button 
-                    onClick={toggleAll}
-                    className="text-xs text-indigo-600 font-bold hover:underline"
-                >
-                    {selectedProjectIds.length === projects.length ? 'Deseleziona Tutti' : 'Seleziona Tutti'}
-                </button>
+        <div className="flex flex-col justify-end items-end space-y-4">
+            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 w-full">
+                <p className="text-sm text-gray-500 mb-1">Anteprima Totali</p>
+                <div className="flex justify-between items-end">
+                     <div>
+                         <p className="text-3xl font-bold text-gray-800">{formatCurrency(totalAmount)}</p>
+                         <p className="text-sm text-gray-600">{filteredEntries.length} servizi selezionati</p>
+                     </div>
+                     <button 
+                        onClick={handlePrint}
+                        className="flex items-center gap-2 bg-slate-800 text-white px-6 py-3 rounded-lg hover:bg-slate-900 transition-colors shadow-lg active:scale-95"
+                    >
+                        <Printer size={20} /> Stampa / Salva PDF
+                    </button>
+                </div>
             </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 border border-gray-100 p-3 rounded-lg bg-gray-50 max-h-48 overflow-y-auto">
-                {projects.map(p => {
-                    const isSelected = selectedProjectIds.includes(p.id);
-                    return (
-                        <button
-                            key={p.id}
-                            onClick={() => toggleProject(p.id)}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm border transition-all text-left ${
-                                isSelected 
-                                ? 'bg-indigo-50 border-indigo-200 text-indigo-800' 
-                                : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
-                            }`}
-                        >
-                            {isSelected ? <CheckSquare size={16} className="text-indigo-600 shrink-0" /> : <Square size={16} className="text-gray-300 shrink-0" />}
-                            <span className="truncate">{p.name}</span>
-                        </button>
-                    )
-                })}
-            </div>
+            <p className="text-xs text-gray-400">
+                Suggerimento: Seleziona più mesi per generare report trimestrali o annuali.
+            </p>
         </div>
       </div>
 
@@ -139,14 +205,14 @@ const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
                   <h1 className="text-3xl font-bold text-slate-900 uppercase tracking-wide">Riepilogo Servizi</h1>
                   <p className="text-slate-500 mt-2">Documento informativo prestazioni</p>
               </div>
-              <div className="text-right">
-                  <h3 className="text-xl font-bold text-indigo-600">
+              <div className="text-right max-w-sm">
+                  <h3 className="text-xl font-bold text-indigo-600 truncate">
                       {selectedProjectIds.length === 1 
                         ? projects.find(p => p.id === selectedProjectIds[0])?.name 
                         : 'Riepilogo Multi-Cliente'}
                   </h3>
-                  <p className="text-slate-600 font-medium">
-                      Periodo: {new Date(selectedMonth).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}
+                  <p className="text-slate-600 font-medium capitalize mt-1">
+                      Periodo: {periodString}
                   </p>
               </div>
           </div>
