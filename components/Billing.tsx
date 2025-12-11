@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Project, TimeEntry } from '../types';
 import { formatCurrency, formatDuration, calculateEarnings, formatTime } from '../utils';
-import { Printer, Calendar, CheckSquare, Square, MapPin } from 'lucide-react';
+import { Printer, Calendar, CheckSquare, Square, MapPin, ChevronDown, Search } from 'lucide-react';
 
 interface BillingProps {
   entries: TimeEntry[];
@@ -9,32 +9,62 @@ interface BillingProps {
 }
 
 const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
-  // Supporto Multi-Selezione
+  // --- STATES ---
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
+  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
+  
+  // UI States
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
+  const [clientSearchTerm, setClientSearchTerm] = useState('');
+  const clientDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Calcola i mesi disponibili dai dati (YYYY-MM)
-  const availableMonths = useMemo(() => {
-      const months = new Set(entries.map(e => new Date(e.startTime).toISOString().slice(0, 7)));
-      return Array.from(months).sort().reverse();
+  // --- DATA COMPUTED ---
+  const availableYears = useMemo(() => {
+      const years = new Set(entries.map(e => new Date(e.startTime).getFullYear().toString()));
+      const sorted = Array.from(years).sort().reverse();
+      const current = new Date().getFullYear().toString();
+      if (!sorted.includes(current)) sorted.unshift(current);
+      return sorted;
   }, [entries]);
 
-  // Inizializza selezionando tutto o i dati più recenti
+  const availableMonthsInYear = useMemo(() => {
+      const months = new Set(
+          entries
+            .filter(e => new Date(e.startTime).getFullYear().toString() === selectedYear)
+            .map(e => new Date(e.startTime).toISOString().slice(0, 7)) // YYYY-MM
+      );
+      return Array.from(months).sort().reverse();
+  }, [entries, selectedYear]);
+
+  // --- EFFECTS ---
   useEffect(() => {
       if (projects.length > 0 && selectedProjectIds.length === 0) {
           setSelectedProjectIds(projects.map(p => p.id));
       }
-      if (availableMonths.length > 0 && selectedMonths.length === 0) {
+      // Auto-select current month or first available
+      if (availableMonthsInYear.length > 0 && selectedMonths.length === 0) {
            const currentMonth = new Date().toISOString().slice(0, 7);
-           if (availableMonths.includes(currentMonth)) {
+           if (availableMonthsInYear.includes(currentMonth)) {
                setSelectedMonths([currentMonth]);
            } else {
-               setSelectedMonths(availableMonths.slice(0, 1));
+               setSelectedMonths(availableMonthsInYear.slice(0, 1));
            }
       }
-  }, [projects, availableMonths]);
+  }, [projects, availableMonthsInYear]);
 
-  // Handlers Toggle
+  // Click outside listener
+  useEffect(() => {
+      function handleClickOutside(event: MouseEvent) {
+          if (clientDropdownRef.current && !clientDropdownRef.current.contains(event.target as Node)) {
+              setIsClientDropdownOpen(false);
+          }
+      }
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // --- HANDLERS ---
   const toggleProject = (id: string) => {
       if (selectedProjectIds.includes(id)) {
           setSelectedProjectIds(selectedProjectIds.filter(pid => pid !== id));
@@ -42,8 +72,13 @@ const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
           setSelectedProjectIds([...selectedProjectIds, id]);
       }
   };
+
   const toggleAllProjects = () => {
-      setSelectedProjectIds(selectedProjectIds.length === projects.length ? [] : projects.map(p => p.id));
+      if (selectedProjectIds.length === projects.length) {
+          setSelectedProjectIds([]);
+      } else {
+          setSelectedProjectIds(projects.map(p => p.id));
+      }
   };
 
   const toggleMonth = (month: string) => {
@@ -53,16 +88,24 @@ const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
           setSelectedMonths([...selectedMonths, month]);
       }
   };
-  const toggleAllMonths = () => {
-      setSelectedMonths(selectedMonths.length === availableMonths.length ? [] : availableMonths);
+
+  const toggleAllMonthsInYear = () => {
+      const allSelected = availableMonthsInYear.every(m => selectedMonths.includes(m));
+      if (allSelected) {
+          setSelectedMonths(prev => prev.filter(m => !availableMonthsInYear.includes(m)));
+      } else {
+          const toAdd = availableMonthsInYear.filter(m => !selectedMonths.includes(m));
+          setSelectedMonths(prev => [...prev, ...toAdd]);
+      }
   };
 
+  // --- FILTERING ---
   const filteredEntries = useMemo(() => {
     return entries.filter(e => {
         if (selectedProjectIds.length === 0 || selectedMonths.length === 0) return false;
         
         const entryMonth = new Date(e.startTime).toISOString().slice(0, 7);
-        // Filtra se l'ID progetto è nell'array dei selezionati E il mese è selezionato
+        // Strict filtering: Project ID matches AND Month matches selected list
         return selectedProjectIds.includes(e.projectId) && selectedMonths.includes(entryMonth);
     }).sort((a, b) => a.startTime - b.startTime);
   }, [entries, selectedProjectIds, selectedMonths]);
@@ -79,17 +122,30 @@ const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
       const date = new Date(parseInt(y), parseInt(mo) - 1, 1);
       return date.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
   };
+  
+  const formatShortMonth = (m: string) => {
+      const [y, mo] = m.split('-');
+      const date = new Date(parseInt(y), parseInt(mo) - 1, 1);
+      return date.toLocaleDateString('it-IT', { month: 'short' });
+  };
 
-  // Costruisci stringa periodo per il PDF
   const periodString = useMemo(() => {
       if (selectedMonths.length === 0) return '-';
       if (selectedMonths.length === 1) return formatMonthLabel(selectedMonths[0]);
       
-      // Se sono tanti, mostriamo range se consecutivi (semplificato: lista separata da virgola)
-      // Ordiniamo per data
       const sorted = [...selectedMonths].sort();
-      return sorted.map(m => formatMonthLabel(m).replace(/ [0-9]{4}/, '')).join(', ') + ' ' + sorted[0].split('-')[0];
+      // Mostra solo i nomi dei mesi se stesso anno
+      const firstYear = sorted[0].split('-')[0];
+      const allSameYear = sorted.every(m => m.startsWith(firstYear));
+      
+      if (allSameYear) {
+          return sorted.map(m => formatShortMonth(m).replace('.', '')).join(', ') + ' ' + firstYear;
+      }
+      return sorted.map(m => formatMonthLabel(m)).join(', ');
   }, [selectedMonths]);
+
+  const showProjectColumn = selectedProjectIds.length > 1;
+  const filteredProjectsList = projects.filter(p => p.name.toLowerCase().includes(clientSearchTerm.toLowerCase()));
 
   if (projects.length === 0) {
       return (
@@ -99,31 +155,108 @@ const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
       );
   }
 
-  // Determina se mostrare la colonna "Cliente" (utile se ne ho selezionati più di uno)
-  const showProjectColumn = selectedProjectIds.length > 1;
-
   return (
     <div className="space-y-6 animate-fade-in max-w-5xl mx-auto">
       
       {/* Controls - Hidden in print */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 print:hidden grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 print:hidden grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <div>
-            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+        <div className="lg:col-span-2 space-y-5">
+            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                 <Calendar className="text-indigo-600" />
                 Configura Periodo e Clienti
             </h2>
             
-            {/* Selettore Mesi Multipli */}
-            <div className="mb-6">
-                <div className="flex justify-between items-center mb-2">
-                    <label className="block text-sm font-bold text-gray-500 uppercase tracking-wide">Mesi da includere</label>
-                    <button onClick={toggleAllMonths} className="text-xs text-indigo-600 font-bold hover:underline">
-                        {selectedMonths.length === availableMonths.length ? 'Deseleziona' : 'Seleziona Tutti'}
+            {/* 1. Year & Client Selector Row */}
+            <div className="flex flex-col sm:flex-row gap-3">
+                 {/* Year Tabs */}
+                 <div className="flex items-center bg-gray-100 p-1 rounded-lg shrink-0">
+                    {availableYears.map(year => (
+                        <button
+                            key={year}
+                            onClick={() => setSelectedYear(year)}
+                            className={`px-3 py-1.5 text-sm font-bold rounded-md transition-all ${
+                                selectedYear === year 
+                                ? 'bg-white text-indigo-600 shadow-sm' 
+                                : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                        >
+                            {year}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Client Dropdown */}
+                <div className="relative w-full sm:w-auto" ref={clientDropdownRef}>
+                    <button 
+                        onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
+                        className={`flex items-center justify-between gap-3 px-4 py-2 rounded-lg text-sm font-medium border transition-all w-full ${
+                            selectedProjectIds.length > 0 && selectedProjectIds.length < projects.length
+                            ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                            : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+                        }`}
+                    >
+                        <div className="flex items-center gap-2">
+                            <MapPin size={16} />
+                            <span>{selectedProjectIds.length === projects.length ? 'Tutti i Clienti' : `${selectedProjectIds.length} Selezionati`}</span>
+                        </div>
+                        <ChevronDown size={14} className={`transition-transform ${isClientDropdownOpen ? 'rotate-180' : ''}`} />
                     </button>
+
+                    {isClientDropdownOpen && (
+                        <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-100 z-50 p-3 animate-slide-down">
+                            <div className="relative mb-3">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                                <input 
+                                    type="text" 
+                                    placeholder="Cerca cliente..." 
+                                    className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500"
+                                    value={clientSearchTerm}
+                                    onChange={e => setClientSearchTerm(e.target.value)}
+                                    autoFocus
+                                />
+                            </div>
+                            <div className="flex justify-between items-center mb-2 px-1">
+                                <span className="text-xs font-bold text-gray-400 uppercase">Lista</span>
+                                <button onClick={toggleAllProjects} className="text-xs text-indigo-600 font-bold hover:underline">
+                                    {selectedProjectIds.length === projects.length ? 'Deseleziona' : 'Tutti'}
+                                </button>
+                            </div>
+                            <div className="max-h-48 overflow-y-auto space-y-1 custom-scrollbar">
+                                {filteredProjectsList.map(p => {
+                                    const isSelected = selectedProjectIds.includes(p.id);
+                                    return (
+                                        <button
+                                            key={p.id}
+                                            onClick={() => toggleProject(p.id)}
+                                            className={`flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm transition-colors text-left ${
+                                                isSelected ? 'bg-indigo-50 text-indigo-800' : 'hover:bg-gray-50 text-gray-600'
+                                            }`}
+                                        >
+                                            {isSelected ? <CheckSquare size={14} className="shrink-0"/> : <Square size={14} className="shrink-0 text-gray-300"/>}
+                                            <span className="truncate">{p.name}</span>
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+            
+            {/* 2. Months Row (Scrollable) */}
+            <div className="pt-2 border-t border-gray-100">
+                <div className="flex items-center justify-between mb-2">
+                     <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Mesi del {selectedYear}</span>
+                     <button onClick={toggleAllMonthsInYear} className="text-xs text-indigo-600 font-bold hover:underline">
+                         Seleziona Tutti
+                     </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                    {availableMonths.map(m => {
+                    {availableMonthsInYear.length === 0 && (
+                        <span className="text-sm text-gray-400 italic">Nessun dato.</span>
+                    )}
+                    {availableMonthsInYear.map(m => {
                         const isSelected = selectedMonths.includes(m);
                         return (
                             <button
@@ -136,37 +269,7 @@ const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
                                 }`}
                             >
                                 {isSelected ? <CheckSquare size={14} /> : <Square size={14} />}
-                                {formatMonthLabel(m)}
-                            </button>
-                        )
-                    })}
-                     {availableMonths.length === 0 && <span className="text-sm text-gray-400 italic">Nessun mese disponibile.</span>}
-                </div>
-            </div>
-
-             {/* Selettore Progetti */}
-            <div>
-                <div className="flex justify-between items-center mb-2">
-                    <label className="block text-sm font-bold text-gray-500 uppercase tracking-wide">Clienti da includere</label>
-                    <button onClick={toggleAllProjects} className="text-xs text-indigo-600 font-bold hover:underline">
-                        {selectedProjectIds.length === projects.length ? 'Deseleziona' : 'Seleziona Tutti'}
-                    </button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                    {projects.map(p => {
-                        const isSelected = selectedProjectIds.includes(p.id);
-                        return (
-                            <button
-                                key={p.id}
-                                onClick={() => toggleProject(p.id)}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border transition-all ${
-                                    isSelected 
-                                    ? 'bg-indigo-50 border-indigo-200 text-indigo-800 font-medium' 
-                                    : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
-                                }`}
-                            >
-                                {isSelected ? <CheckSquare size={14} /> : <Square size={14} />}
-                                {p.name}
+                                {formatShortMonth(m)}
                             </button>
                         )
                     })}
@@ -174,24 +277,21 @@ const Billing: React.FC<BillingProps> = ({ entries, projects }) => {
             </div>
         </div>
 
-        <div className="flex flex-col justify-end items-end space-y-4">
-            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 w-full">
-                <p className="text-sm text-gray-500 mb-1">Anteprima Totali</p>
-                <div className="flex justify-between items-end">
-                     <div>
-                         <p className="text-3xl font-bold text-gray-800">{formatCurrency(totalAmount)}</p>
-                         <p className="text-sm text-gray-600">{filteredEntries.length} servizi selezionati</p>
-                     </div>
-                     <button 
-                        onClick={handlePrint}
-                        className="flex items-center gap-2 bg-slate-800 text-white px-6 py-3 rounded-lg hover:bg-slate-900 transition-colors shadow-lg active:scale-95"
-                    >
-                        <Printer size={20} /> Stampa / Salva PDF
-                    </button>
-                </div>
+        <div className="lg:col-span-1 border-t lg:border-t-0 lg:border-l border-gray-100 pt-6 lg:pt-0 lg:pl-6 flex flex-col justify-end">
+            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 w-full mb-4">
+                <p className="text-sm text-gray-500 mb-1">Totale Stimato</p>
+                <p className="text-3xl font-bold text-gray-800">{formatCurrency(totalAmount)}</p>
+                <p className="text-sm text-gray-600 mt-1">{filteredEntries.length} servizi selezionati</p>
             </div>
-            <p className="text-xs text-gray-400">
-                Suggerimento: Seleziona più mesi per generare report trimestrali o annuali.
+            <button 
+                onClick={handlePrint}
+                disabled={filteredEntries.length === 0}
+                className="w-full flex justify-center items-center gap-2 bg-slate-800 disabled:bg-slate-300 text-white px-6 py-3 rounded-lg hover:bg-slate-900 transition-colors shadow-lg active:scale-95"
+            >
+                <Printer size={20} /> Stampa / PDF
+            </button>
+            <p className="text-xs text-center text-gray-400 mt-3">
+                Solo i mesi selezionati verranno inclusi.
             </p>
         </div>
       </div>
